@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+        <title>Scheduler Framework 源码分析 - 打怪實錄</title><meta name="Description" content=""><meta property="og:title" content="Scheduler Framework 源码分析" />
+<meta property="og:description" content="Scheduler framework 前面我们聊了 kubernetes 的默认调度器 default scheduler，其简单的调度逻辑，在 kubernetes 多个版本的迭代中一直保持稳定性能。不过随着 Kubernetes 部署的任务类型越来越多" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://kuikuikuizzz.github.io/posts/scheduler_framework/" />
+<meta property="article:published_time" content="2021-01-29T11:06:54+08:00" />
+<meta property="article:modified_time" content="2021-01-29T11:06:54+08:00" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Scheduler Framework 源码分析"/>
+<meta name="twitter:description" content="Scheduler framework 前面我们聊了 kubernetes 的默认调度器 default scheduler，其简单的调度逻辑，在 kubernetes 多个版本的迭代中一直保持稳定性能。不过随着 Kubernetes 部署的任务类型越来越多"/>
+<meta name="application-name" content="打怪實錄">
+<meta name="apple-mobile-web-app-title" content="打怪實錄"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="https://kuikuikuizzz.github.io/posts/scheduler_framework/" /><link rel="prev" href="https://kuikuikuizzz.github.io/posts/scheduler_public/" /><link rel="next" href="https://kuikuikuizzz.github.io/posts/volcano_public/" /><link rel="stylesheet" href="/lib/normalize/normalize.min.css"><link rel="stylesheet" href="/css/style.min.css"><link rel="stylesheet" href="/lib/fontawesome-free/all.min.css"><link rel="stylesheet" href="/lib/animate/animate.min.css"><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "Scheduler Framework 源码分析",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "https:\/\/kuikuikuizzz.github.io\/posts\/scheduler_framework\/"
+        },"genre": "posts","wordcount":  4756 ,
+        "url": "https:\/\/kuikuikuizzz.github.io\/posts\/scheduler_framework\/","datePublished": "2021-01-29T11:06:54+08:00","dateModified": "2021-01-29T11:06:54+08:00","publisher": {
+            "@type": "Organization",
+            "name": "kuikuikuizzZ"},"author": {
+                "@type": "Person",
+                "name": "kuikuikuizzZ"
+            },"description": ""
+    }
+    </script></head>
+    <body header-desktop="" header-mobile=""><script type="text/javascript">(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : '' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="打怪實錄">打怪實錄</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/categories/"> 分类 </a><span class="menu-item delimiter"></span><a href="javascript:void(0);" class="menu-item theme-switch" title="切换主题">
+                    <i class="fas fa-adjust fa-fw"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="打怪實錄">打怪實錄</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/categories/" title="">分类</a><a href="javascript:void(0);" class="menu-item theme-switch" title="切换主题">
+                <i class="fas fa-adjust fa-fw"></i>
+            </a></div>
+    </div>
+</header>
+<div class="search-dropdown desktop">
+    <div id="search-dropdown-desktop"></div>
+</div>
+<div class="search-dropdown mobile">
+    <div id="search-dropdown-mobile"></div>
+</div>
+<main class="main">
+                <div class="container"><div class="toc" id="toc-auto">
+            <h2 class="toc-title">目录</h2>
+            <div class="toc-content" id="toc-content-auto"></div>
+        </div><article class="page single"><h1 class="single-title animated flipInX">Scheduler Framework 源码分析</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel=" author" class="author"><i class="fas fa-user-circle fa-fw"></i>kuikuikuizzZ</a></span></div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw"></i>&nbsp;<time datetime="2021-01-29">2021-01-29</time>&nbsp;<i class="fas fa-pencil-alt fa-fw"></i>&nbsp;约 4756 字&nbsp;
+                <i class="far fa-clock fa-fw"></i>&nbsp;预计阅读 10 分钟&nbsp;</div>
+        </div><div class="details toc" id="toc-static"  kept="">
+                <div class="details-summary toc-title">
+                    <span>目录</span>
+                    <span><i class="details-icon fas fa-angle-right"></i></span>
+                </div>
+                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents">
+  <ul>
+    <li><a href="#原理">原理</a>
+      <ul>
+        <li><a href="#preparing">Preparing</a></li>
+        <li><a href="#scheduling">Scheduling</a></li>
+        <li><a href="#binding">Binding</a></li>
+      </ul>
+    </li>
+    <li><a href="#实现">实现</a>
+      <ul>
+        <li><a href="#framwork">Framwork</a></li>
+        <li><a href="#plugin">Plugin</a></li>
+        <li><a href="#registry">Registry</a></li>
+        <li><a href="#scheduler-plugins">Scheduler-plugins</a></li>
+      </ul>
+    </li>
+    <li><a href="#总结">总结</a></li>
+    <li><a href="#reference">Reference</a></li>
+  </ul>
+</nav></div>
+            </div><div class="content" id="content"><h1 id="scheduler-framework">Scheduler framework</h1>
+<p>　　前面我们聊了 kubernetes 的默认调度器 default scheduler，其简单的调度逻辑，在 kubernetes 多个版本的迭代中一直保持稳定性能。不过随着 Kubernetes 部署的任务类型越来越多，原生的调度器已经不能应对多样的调度需求：比如机器学习、深度学习训练任务中对于多个 pod 协同调度的需求；大数据作业有原来自己的生态，需要在调度层面做相应的适配和迁移；原来高性能计算作业中，对一些高性能组件像 GPU、infiniteBand 网络、存储卷的动态资源的绑定需求等。另外，越来越多的 feature 也一直在被引入到 scheduler 的主干中，也使得 kube-scheduler 的维护变得越来越困难。</p>
+<p>　　所以，kubernetes 社区在 v1.15 的版本中开始逐步引入 scheduler framework 为 kube-scheduler 带来更多的可扩展性，把之前很多的调度逻辑函数都通过 plugin 的形式重新改造，同时引入了更多位点方便定制 scheduler。本文会先讨论 scheduler 的原理，然后通过分析不同的 plugin 的代码实现来更加具体的了解 scheduler framework。</p>
+<h2 id="原理">原理</h2>
+<p>scheduler framework 最早是通过 kubernetes enhancements 的 <a href="https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/624-scheduling-framework" target="_blank" rel="noopener noreffer">624-scheduling-framework</a> 提案引入的，主要是为了实现以下几个目标：</p>
+<ul>
+<li>提供更多自定位位点和更多的可扩展性。</li>
+<li>简化scheduler 的核心代码，把部分 features 的实现迁移到 plugin 中。</li>
+<li>提供一种高效的机制，确认 plugins 的结果或者启用 plugins 的结果，并对发生的错误进行处理。</li>
+<li>支持 out-of-tree 的扩展等。</li>
+</ul>
+<p>为此 scheduler framework 定义了多个扩展点如下：</p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="scheduling-framework-extensions.png"
+        data-srcset="/posts/scheduler_framework/scheduling-framework-extensions.png, scheduling-framework-extensions.png 1.5x, /posts/scheduler_framework/scheduling-framework-extensions.png 2x"
+        data-sizes="auto"
+        alt="/posts/scheduler_framework/scheduling-framework-extensions.png"
+        title="scheduling-framework-extensions" /></p>
+<p>上图的调度周期（scheduling cycle）和绑定周期（binding cycle）具体的逻辑在我们之前的文章中已经有所讲述了，不过为了讲述方便我们也回顾一下，kube-scheduler 具体的调度过程。</p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="scheduler_framework.png"
+        data-srcset="/posts/scheduler_framework/scheduler_framework.png, scheduler_framework.png 1.5x, /posts/scheduler_framework/scheduler_framework.png 2x"
+        data-sizes="auto"
+        alt="/posts/scheduler_framework/scheduler_framework.png"
+        title="scheduler_framework" /></p>
+<h3 id="preparing">Preparing</h3>
+<ul>
+<li>当用户创建 pod 的时候，apiserver 接受请求把数据写入到 etcd</li>
+<li>scheduler 的 informer 会监听到 pod 创建的信息，然后把事件同步给 scheudulingQueue （如果是已经调度过的pod，如：被删除的deployment 的 pod 会同步到 schedulerCache），进入 scheudulingQueue 的 pod 会通过 <strong>Sort</strong> 的 plugins 对 pod 的优先级进行排序，优先级高的放在前面。</li>
+</ul>
+<h3 id="scheduling">Scheduling</h3>
+<ul>
+<li>scheduler 的主逻辑（scheduleOne）会不断地从 schedulingQueue 弹出未调度的 pod</li>
+<li>然后调用 <strong>PrefilterPlugins</strong> 对 pod 进行预筛选，只有当所有的 PreFilter 插件都返回 success 时，才能进入下一个阶段，否则 Pod 将会被拒绝掉，标识此次调度流程失败。</li>
+<li>然后调用 <strong>FilterPlugins</strong> 对 nodes 的信息进行筛选，这里主要对应之前 scheduler 版本中的 Predicate 的逻辑，用来过滤掉不满足 Pod 调度要求的节点。。</li>
+<li>然后会把前面过滤的 nodes 塞给 prioritizeNodes 函数，prioritizeNodes 主要会给前面过滤的 nodes 一个分数。期间会调用 <strong>PreScorePlugins</strong> 主要用于在 Score 之前进行一些信息生成。而 <strong>ScorePlugins</strong> 则用于计算每个plugins 对每个节点的分数，对应之前版本 scheduler  中 Priority 的逻辑，在汇总分数的时候会调用 <strong>NormalizeScore</strong> 用于对分数标准化。</li>
+<li>通过 selectHost 进行汇总和选出合适的节点</li>
+<li>如果没有选出合适的节点，会调用 <strong>PostFilterPlugins</strong> 主要是选主失败的时候调用，会运行抢占驱逐等逻辑</li>
+<li>如果调度成功会通过 assume 告诉 cache pod 已经调度，之后会调用 <strong>ReservePlugins</strong> 也会告诉 cache 要预留 pod 调度需要的资源。通常设置了 reservePlugins 就需要设置 <strong>UnReservePlugins</strong> 保证如果后续的步骤失败了，可以释放前面预调度预留的资源。</li>
+<li>然后触发 <strong>PermitPlugins</strong>，这个扩展点是 framework 引入的新功能，当 Pod 在 Reserve 阶段完成资源预留之后，Bind 操作之前，开发者可以定义自己的策略在 Permit 节点进行拦截，根据条件对经过此阶段的 Pod 进行 allow、reject 和 wait 的 3 种操作。只要有一个 permit 不满足，就会在后面的绑定的时候停留在 waitOnPermit 中，直到 permit 的条件满足或者超时。</li>
+</ul>
+<h3 id="binding">Binding</h3>
+<ul>
+<li>然后进入异步绑定逻辑，会调用 <strong>PreBindPlugins</strong> 主要是对所需的网络，存储等资源进行预绑定。</li>
+<li>然后进入bind函数，会调用 <strong>BindPlugins</strong>，这个扩展点是之前版本 scheduler 中的 Bind 操作，不过目前主要还是维持默认的绑定方式。</li>
+<li>如果绑定成功会调用 <strong>PostBindPlugins</strong> 对绑定现场进行清理。</li>
+</ul>
+<p>上面就是整一个调度流程的步骤，也已经把所有 plugin 的位点给出，下面我们会看一下 plugin 具体的实现结构。</p>
+<h2 id="实现">实现</h2>
+<p>​		为了复现和查找，我这里的主要以 <a href="https://github.com/kubernetes/kubernetes" target="_blank" rel="noopener noreffer">kubernetes</a> 的 v1.19.1 的版本进行分析。上面我们讲述了 scheduler framework 的一系列位点和起的作用，在源码中，scheduler-framework 主要是通过 pkg/scheduler/framework/runtime/framework.go 中的 frameworkImpl 来实现 pkg/scheduler/framework/v1alpha1/interface.go  中的 Framework 接口，然后在通过 scheduleOne 中调用相关逻辑来实现 plugin 的注入的。</p>
+<h3 id="framwork">Framwork</h3>
+<p>​		使用上，可以认为一个 framework 就是一个调度器骨架，里面可以加入各种 plugins，kube-scheduler 就是一个 framework 实现的调度器，不过加入了各种 default 的 plugins 而已。Framework 提供的接口跟上面调度流程的每一个 plugin 基本上一一对应，同时加入了 FrameworkHandle 的接口，主要提供 ClientSet 和 Informer 等接口方便根据不同资源进行调度。Framework 的接口如下所示，提供对不同 plugins 的调度逻辑，而这些都会在 scheduleOne 的调度主进程中会被调用到。</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">Framework</span> <span class="kd">interface</span> <span class="p">{</span>
+   <span class="nx">FrameworkHandle</span>
+  
+   <span class="nf">QueueSortFunc</span><span class="p">()</span> <span class="nx">LessFunc</span>
+  
+   <span class="nf">RunPreFilterPlugins</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">)</span> <span class="o">*</span><span class="nx">Status</span>
+  
+   <span class="nf">RunFilterPlugins</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodeInfo</span> <span class="o">*</span><span class="nx">NodeInfo</span><span class="p">)</span> <span class="nx">PluginToStatus</span>
+  
+   <span class="nf">RunPostFilterPlugins</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">filteredNodeStatusMap</span> <span class="nx">NodeToStatusMap</span><span class="p">)</span> <span class="p">(</span><span class="o">*</span><span class="nx">PostFilterResult</span><span class="p">,</span> <span class="o">*</span><span class="nx">Status</span><span class="p">)</span>
+  
+   <span class="nf">RunPreFilterExtensionAddPod</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">podToSchedule</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">podToAdd</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodeInfo</span> <span class="o">*</span><span class="nx">NodeInfo</span><span class="p">)</span> <span class="o">*</span><span class="nx">Status</span>
+  
+   <span class="nf">RunPreFilterExtensionRemovePod</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">podToSchedule</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">podToAdd</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodeInfo</span> <span class="o">*</span><span class="nx">NodeInfo</span><span class="p">)</span> <span class="o">*</span><span class="nx">Status</span>
+  
+   <span class="nf">RunPreScorePlugins</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodes</span> <span class="p">[]</span><span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Node</span><span class="p">)</span> <span class="o">*</span><span class="nx">Status</span>
+  
+   <span class="nf">RunScorePlugins</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodes</span> <span class="p">[]</span><span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Node</span><span class="p">)</span> <span class="p">(</span><span class="nx">PluginToNodeScores</span><span class="p">,</span> <span class="o">*</span><span class="nx">Status</span><span class="p">)</span>
+  
+   <span class="nf">RunPreBindPlugins</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodeName</span> <span class="kt">string</span><span class="p">)</span> <span class="o">*</span><span class="nx">Status</span>
+  
+   <span class="nf">RunPostBindPlugins</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodeName</span> <span class="kt">string</span><span class="p">)</span>
+  
+   <span class="nf">RunReservePluginsReserve</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodeName</span> <span class="kt">string</span><span class="p">)</span> <span class="o">*</span><span class="nx">Status</span>
+  
+   <span class="nf">RunReservePluginsUnreserve</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodeName</span> <span class="kt">string</span><span class="p">)</span>
+  
+   <span class="nf">RunPermitPlugins</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodeName</span> <span class="kt">string</span><span class="p">)</span> <span class="o">*</span><span class="nx">Status</span>
+  
+   <span class="nf">WaitOnPermit</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">)</span> <span class="o">*</span><span class="nx">Status</span>
+  
+   <span class="nf">RunBindPlugins</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodeName</span> <span class="kt">string</span><span class="p">)</span> <span class="o">*</span><span class="nx">Status</span>
+  
+   <span class="nf">HasFilterPlugins</span><span class="p">()</span> <span class="kt">bool</span>
+  
+   <span class="nf">HasPostFilterPlugins</span><span class="p">()</span> <span class="kt">bool</span>
+  
+   <span class="nf">HasScorePlugins</span><span class="p">()</span> <span class="kt">bool</span>
+  
+   <span class="nf">ListPlugins</span><span class="p">()</span> <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">][]</span><span class="nx">config</span><span class="p">.</span><span class="nx">Plugin</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">FrameworkHandle</span> <span class="kd">interface</span> <span class="p">{</span>
+	<span class="nf">SnapshotSharedLister</span><span class="p">()</span> <span class="nx">SharedLister</span>
+
+	<span class="nf">IterateOverWaitingPods</span><span class="p">(</span><span class="nx">callback</span> <span class="kd">func</span><span class="p">(</span><span class="nx">WaitingPod</span><span class="p">))</span>
+
+	<span class="nf">GetWaitingPod</span><span class="p">(</span><span class="nx">uid</span> <span class="nx">types</span><span class="p">.</span><span class="nx">UID</span><span class="p">)</span> <span class="nx">WaitingPod</span>
+
+	<span class="nf">RejectWaitingPod</span><span class="p">(</span><span class="nx">uid</span> <span class="nx">types</span><span class="p">.</span><span class="nx">UID</span><span class="p">)</span>
+
+	<span class="nf">ClientSet</span><span class="p">()</span> <span class="nx">clientset</span><span class="p">.</span><span class="nx">Interface</span>
+
+	<span class="nf">EventRecorder</span><span class="p">()</span> <span class="nx">events</span><span class="p">.</span><span class="nx">EventRecorder</span>
+
+	<span class="nf">SharedInformerFactory</span><span class="p">()</span> <span class="nx">informers</span><span class="p">.</span><span class="nx">SharedInformerFactory</span>
+
+	<span class="nf">PreemptHandle</span><span class="p">()</span> <span class="nx">PreemptHandle</span>
+<span class="p">}</span>
+</code></pre></div><p>在 pkg/scheduler/framework/runtime/framework.go 中 frameworkImpl 实现了 Framework 的接口，基本上如果没有特殊需求（改变不同 plugins 通过的逻辑等），可以直接使用 frameworkImpl 的实现，基本上所有的接口函数就是提供调用不同 plugins 的逻辑，有的是只要有一个plugins通过了，就会往下走，如RunPostFilterPlugins，只要有一个postFilterPlugin success 就会往下走（下面第一个），有的是要所有plugins通过了，才会往下走，如 RunFilterPlugins 会轮询所有的plugins都通过才往下走（下面第二个） ，否则返回错误示例如下：</p>
+<p><strong>RunPostFilterPlugins</strong>：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">f</span> <span class="o">*</span><span class="nx">frameworkImpl</span><span class="p">)</span> <span class="nf">RunPostFilterPlugins</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">filteredNodeStatusMap</span> <span class="nx">framework</span><span class="p">.</span><span class="nx">NodeToStatusMap</span><span class="p">)</span> <span class="p">(</span><span class="nx">_</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">PostFilterResult</span><span class="p">,</span> <span class="nx">status</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">Status</span><span class="p">)</span> <span class="p">{</span>
+   <span class="nx">startTime</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Now</span><span class="p">()</span>
+   <span class="k">defer</span> <span class="kd">func</span><span class="p">()</span> <span class="p">{</span>
+      <span class="nx">metrics</span><span class="p">.</span><span class="nx">FrameworkExtensionPointDuration</span><span class="p">.</span><span class="nf">WithLabelValues</span><span class="p">(</span><span class="nx">postFilter</span><span class="p">,</span> <span class="nx">status</span><span class="p">.</span><span class="nf">Code</span><span class="p">().</span><span class="nf">String</span><span class="p">(),</span> <span class="nx">f</span><span class="p">.</span><span class="nx">profileName</span><span class="p">).</span><span class="nf">Observe</span><span class="p">(</span><span class="nx">metrics</span><span class="p">.</span><span class="nf">SinceInSeconds</span><span class="p">(</span><span class="nx">startTime</span><span class="p">))</span>
+   <span class="p">}()</span>
+
+   <span class="nx">statuses</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="nx">framework</span><span class="p">.</span><span class="nx">PluginToStatus</span><span class="p">)</span>
+   <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">pl</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">f</span><span class="p">.</span><span class="nx">postFilterPlugins</span> <span class="p">{</span>
+      <span class="nx">r</span><span class="p">,</span> <span class="nx">s</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">.</span><span class="nf">runPostFilterPlugin</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">pl</span><span class="p">,</span> <span class="nx">state</span><span class="p">,</span> <span class="nx">pod</span><span class="p">,</span> <span class="nx">filteredNodeStatusMap</span><span class="p">)</span>
+      <span class="k">if</span> <span class="nx">s</span><span class="p">.</span><span class="nf">IsSuccess</span><span class="p">()</span> <span class="p">{</span>
+         <span class="k">return</span> <span class="nx">r</span><span class="p">,</span> <span class="nx">s</span>
+      <span class="p">}</span> <span class="k">else</span> <span class="k">if</span> <span class="p">!</span><span class="nx">s</span><span class="p">.</span><span class="nf">IsUnschedulable</span><span class="p">()</span> <span class="p">{</span>
+         <span class="c1">// Any status other than Success or Unschedulable is Error.
+</span><span class="c1"></span>         <span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">framework</span><span class="p">.</span><span class="nf">NewStatus</span><span class="p">(</span><span class="nx">framework</span><span class="p">.</span><span class="nx">Error</span><span class="p">,</span> <span class="nx">s</span><span class="p">.</span><span class="nf">Message</span><span class="p">())</span>
+      <span class="p">}</span>
+      <span class="nx">statuses</span><span class="p">[</span><span class="nx">pl</span><span class="p">.</span><span class="nf">Name</span><span class="p">()]</span> <span class="p">=</span> <span class="nx">s</span>
+   <span class="p">}</span>
+
+   <span class="k">return</span> <span class="kc">nil</span><span class="p">,</span> <span class="nx">statuses</span><span class="p">.</span><span class="nf">Merge</span><span class="p">()</span>
+<span class="p">}</span>
+</code></pre></div><p><strong>RunFilterPlugins</strong>：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">f</span> <span class="o">*</span><span class="nx">frameworkImpl</span><span class="p">)</span> <span class="nf">RunFilterPlugins</span><span class="p">(</span>
+   <span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span>
+   <span class="nx">state</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">CycleState</span><span class="p">,</span>
+   <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span>
+   <span class="nx">nodeInfo</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">NodeInfo</span><span class="p">,</span>
+<span class="p">)</span> <span class="nx">framework</span><span class="p">.</span><span class="nx">PluginToStatus</span> <span class="p">{</span>
+   <span class="nx">statuses</span> <span class="o">:=</span> <span class="nb">make</span><span class="p">(</span><span class="nx">framework</span><span class="p">.</span><span class="nx">PluginToStatus</span><span class="p">)</span>
+   <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">pl</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">f</span><span class="p">.</span><span class="nx">filterPlugins</span> <span class="p">{</span>
+      <span class="nx">pluginStatus</span> <span class="o">:=</span> <span class="nx">f</span><span class="p">.</span><span class="nf">runFilterPlugin</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">pl</span><span class="p">,</span> <span class="nx">state</span><span class="p">,</span> <span class="nx">pod</span><span class="p">,</span> <span class="nx">nodeInfo</span><span class="p">)</span>
+      <span class="k">if</span> <span class="p">!</span><span class="nx">pluginStatus</span><span class="p">.</span><span class="nf">IsSuccess</span><span class="p">()</span> <span class="p">{</span>
+        <span class="o">...</span>
+      <span class="p">}</span>
+   <span class="p">}</span>
+
+   <span class="k">return</span> <span class="nx">statuses</span>
+<span class="p">}</span>
+</code></pre></div><h3 id="plugin">Plugin</h3>
+<p>　　我们继续以 RunFilterPlugins 为例继续往下看，上面会分别为不同的 plugin 调用 runFilterPlugin(示例如下)：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">f</span> <span class="o">*</span><span class="nx">frameworkImpl</span><span class="p">)</span> <span class="nf">runFilterPlugin</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">pl</span> <span class="nx">framework</span><span class="p">.</span><span class="nx">FilterPlugin</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodeInfo</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">NodeInfo</span><span class="p">)</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">Status</span> <span class="p">{</span>
+   <span class="k">if</span> <span class="p">!</span><span class="nx">state</span><span class="p">.</span><span class="nf">ShouldRecordPluginMetrics</span><span class="p">()</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="nx">pl</span><span class="p">.</span><span class="nf">Filter</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">state</span><span class="p">,</span> <span class="nx">pod</span><span class="p">,</span> <span class="nx">nodeInfo</span><span class="p">)</span>
+   <span class="p">}</span>
+   <span class="nx">startTime</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Now</span><span class="p">()</span>
+   <span class="nx">status</span> <span class="o">:=</span> <span class="nx">pl</span><span class="p">.</span><span class="nf">Filter</span><span class="p">(</span><span class="nx">ctx</span><span class="p">,</span> <span class="nx">state</span><span class="p">,</span> <span class="nx">pod</span><span class="p">,</span> <span class="nx">nodeInfo</span><span class="p">)</span>
+   <span class="nx">f</span><span class="p">.</span><span class="nx">metricsRecorder</span><span class="p">.</span><span class="nf">observePluginDurationAsync</span><span class="p">(</span><span class="nx">Filter</span><span class="p">,</span> <span class="nx">pl</span><span class="p">.</span><span class="nf">Name</span><span class="p">(),</span> <span class="nx">status</span><span class="p">,</span> <span class="nx">metrics</span><span class="p">.</span><span class="nf">SinceInSeconds</span><span class="p">(</span><span class="nx">startTime</span><span class="p">))</span>
+   <span class="k">return</span> <span class="nx">status</span>
+<span class="p">}</span>
+</code></pre></div><p>然后调用 FilterPlugin 的 Filter 方法，这步就是我们需要自己实现的步骤了，我们看一下，FilterPlugin 的定义如下：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">Plugin</span> <span class="kd">interface</span> <span class="p">{</span>
+   <span class="nf">Name</span><span class="p">()</span> <span class="kt">string</span>
+<span class="p">}</span>
+<span class="kd">type</span> <span class="nx">FilterPlugin</span> <span class="kd">interface</span> <span class="p">{</span>
+	<span class="nx">Plugin</span>
+  
+	<span class="nf">Filter</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodeInfo</span> <span class="o">*</span><span class="nx">NodeInfo</span><span class="p">)</span> <span class="o">*</span><span class="nx">Status</span>
+<span class="p">}</span>
+
+</code></pre></div><p>如果需要添加自定义的过滤步骤，只需要实现Name, Filter 函数，然后在启动 custom scheduler 的时候加上这个 plugins 就可以了。其他的 plugin 都是类似的，需要实现 Score, Reserve 等接口，这里我们只看一个 FilterPlugin 的实现——节点亲和性（nodeaffinity），并以其为例进行讲述。</p>
+<h4 id="nodeaffinity">nodeAffinity</h4>
+<p>　　一般来说，节点的亲和性可以通过 pod.nodeSelectors 的字段进行配置，如 pod需要运行在 带有 &ldquo;storage&rdquo; :&ldquo;ssd&rdquo;  的机器上，可以在 pod.nodeSelector 中添加相关的字段。如：</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml"><span class="k">apiVersion</span><span class="p">:</span><span class="w"> </span>v1<span class="w">
+</span><span class="w"></span><span class="k">kind</span><span class="p">:</span><span class="w"> </span>Pod<span class="w">
+</span><span class="w"></span><span class="k">metadata</span><span class="p">:</span><span class="w">
+</span><span class="w">  </span><span class="k">name</span><span class="p">:</span><span class="w"> </span>nginx<span class="w">
+</span><span class="w"></span><span class="k">spec</span><span class="p">:</span><span class="w">
+</span><span class="w">  </span><span class="k">nodeSelector</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="k">storage</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;ssd&#34;</span><span class="w">
+</span><span class="w">  </span><span class="k">containers</span><span class="p">:</span><span class="w">
+</span><span class="w">  </span>- <span class="k">name</span><span class="p">:</span><span class="w"> </span>nginx<span class="w">
+</span></code></pre></div><p>不过上面通过 nodeSelector 是比较硬性的要求，也可以使用节点亲和性的约束更加精细化地优化：</p>
+<ul>
+<li>requiredDuringSchedulingIgnoredDuringExecution</li>
+<li>requiredDuringSchedulingRequiredDuringExecution</li>
+<li>preferredDuringSchedulingIgnoredDuringExecution</li>
+<li>preferredDuringSchedulingRequiredDuringExecution</li>
+</ul>
+<p>上面四个条件 require 表示硬性的条件，preferred 是软性的，前面 DuringScheduling 表示只需要在调度时候满足就可以了，后面 DuringExecution 表示需要在 执行的时候也需要满足，主要是在 node 标签发生变化的时候产生。如下面的 pod 表示需要调度到具有 <code>e2e-az1</code>，<code>e2e-az2</code> 这两个label的节点上， 另外，在满足这些标准的节点中，具有标签键为 <code>another-node-label-key</code> 且标签值为 <code>another-node-label-value</code> 的节点应该优先使用。</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml"><span class="k">apiVersion</span><span class="p">:</span><span class="w"> </span>v1<span class="w">
+</span><span class="w"></span><span class="k">kind</span><span class="p">:</span><span class="w"> </span>Pod<span class="w">
+</span><span class="w"></span><span class="k">metadata</span><span class="p">:</span><span class="w">
+</span><span class="w">  </span><span class="k">name</span><span class="p">:</span><span class="w"> </span>with-node-affinity<span class="w">
+</span><span class="w"></span><span class="k">spec</span><span class="p">:</span><span class="w">
+</span><span class="w">  </span><span class="k">affinity</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="k">nodeAffinity</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span><span class="k">requiredDuringSchedulingIgnoredDuringExecution</span><span class="p">:</span><span class="w">
+</span><span class="w">        </span><span class="k">nodeSelectorTerms</span><span class="p">:</span><span class="w">
+</span><span class="w">        </span>- <span class="k">matchExpressions</span><span class="p">:</span><span class="w">
+</span><span class="w">          </span>- <span class="k">key</span><span class="p">:</span><span class="w"> </span>kubernetes.io/e2e-az-name<span class="w">
+</span><span class="w">            </span><span class="k">operator</span><span class="p">:</span><span class="w"> </span>In<span class="w">
+</span><span class="w">            </span><span class="k">values</span><span class="p">:</span><span class="w">
+</span><span class="w">            </span>- e2e-az1<span class="w">
+</span><span class="w">            </span>- e2e-az2<span class="w">
+</span><span class="w">      </span><span class="k">preferredDuringSchedulingIgnoredDuringExecution</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span>- <span class="k">weight</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span><span class="w">        </span><span class="k">preference</span><span class="p">:</span><span class="w">
+</span><span class="w">          </span><span class="k">matchExpressions</span><span class="p">:</span><span class="w">
+</span><span class="w">          </span>- <span class="k">key</span><span class="p">:</span><span class="w"> </span>another-node-label-key<span class="w">
+</span><span class="w">            </span><span class="k">operator</span><span class="p">:</span><span class="w"> </span>In<span class="w">
+</span><span class="w">            </span><span class="k">values</span><span class="p">:</span><span class="w">
+</span><span class="w">            </span>- another-node-label-value<span class="w">
+</span><span class="w">  </span><span class="k">containers</span><span class="p">:</span><span class="w">
+</span><span class="w">  </span>- <span class="k">name</span><span class="p">:</span><span class="w"> </span>with-node-affinity<span class="w">
+</span><span class="w">    </span><span class="k">image</span><span class="p">:</span><span class="w"> </span>k8s.gcr.io/pause<span class="p">:</span><span class="m">2.0</span><span class="w">
+</span></code></pre></div><p>​　　了解了上面的 nodeSelector, nodeAffinity 的行为，我们看一下调度器是怎么做的。对于硬性的亲和性条件，是通过 Filter 函数实现的，具体逻辑在 PodMatchesNodeSelectorAndAffinityTerms 函数中 ，先查看selector，如果有设置 selector 看一下是不是 match，如果 match 就返回 true，如果设置了硬性的 RequiredDuringSchedulingIgnoredDuringExecution，看一下是不是这个node，否则直接通过。</p>
+<p>pkg/scheduler/framework/plugins/nodeaffinity/node_affinity.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">pl</span> <span class="o">*</span><span class="nx">NodeAffinity</span><span class="p">)</span> <span class="nf">Filter</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodeInfo</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">NodeInfo</span><span class="p">)</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">Status</span> <span class="p">{</span>
+   <span class="nx">node</span> <span class="o">:=</span> <span class="nx">nodeInfo</span><span class="p">.</span><span class="nf">Node</span><span class="p">()</span>
+   <span class="k">if</span> <span class="nx">node</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="nx">framework</span><span class="p">.</span><span class="nf">NewStatus</span><span class="p">(</span><span class="nx">framework</span><span class="p">.</span><span class="nx">Error</span><span class="p">,</span> <span class="s">&#34;node not found&#34;</span><span class="p">)</span>
+   <span class="p">}</span>
+   <span class="k">if</span> <span class="p">!</span><span class="nx">pluginhelper</span><span class="p">.</span><span class="nf">PodMatchesNodeSelectorAndAffinityTerms</span><span class="p">(</span><span class="nx">pod</span><span class="p">,</span> <span class="nx">node</span><span class="p">)</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="nx">framework</span><span class="p">.</span><span class="nf">NewStatus</span><span class="p">(</span><span class="nx">framework</span><span class="p">.</span><span class="nx">UnschedulableAndUnresolvable</span><span class="p">,</span> <span class="nx">ErrReason</span><span class="p">)</span>
+   <span class="p">}</span>
+   <span class="k">return</span> <span class="kc">nil</span>
+<span class="p">}</span>
+</code></pre></div><p>pkg/scheduler/framework/plugins/helper/node_affinity.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">PodMatchesNodeSelectorAndAffinityTerms</span><span class="p">(</span><span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">node</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Node</span><span class="p">)</span> <span class="kt">bool</span> <span class="p">{</span>
+   <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">pod</span><span class="p">.</span><span class="nx">Spec</span><span class="p">.</span><span class="nx">NodeSelector</span><span class="p">)</span> <span class="p">&gt;</span> <span class="mi">0</span> <span class="p">{</span>
+      <span class="nx">selector</span> <span class="o">:=</span> <span class="nx">labels</span><span class="p">.</span><span class="nf">SelectorFromSet</span><span class="p">(</span><span class="nx">pod</span><span class="p">.</span><span class="nx">Spec</span><span class="p">.</span><span class="nx">NodeSelector</span><span class="p">)</span>
+      <span class="k">if</span> <span class="p">!</span><span class="nx">selector</span><span class="p">.</span><span class="nf">Matches</span><span class="p">(</span><span class="nx">labels</span><span class="p">.</span><span class="nf">Set</span><span class="p">(</span><span class="nx">node</span><span class="p">.</span><span class="nx">Labels</span><span class="p">))</span> <span class="p">{</span>
+         <span class="k">return</span> <span class="kc">false</span>
+      <span class="p">}</span>
+   <span class="p">}</span>
+   <span class="nx">nodeAffinityMatches</span> <span class="o">:=</span> <span class="kc">true</span>
+   <span class="nx">affinity</span> <span class="o">:=</span> <span class="nx">pod</span><span class="p">.</span><span class="nx">Spec</span><span class="p">.</span><span class="nx">Affinity</span>
+   <span class="k">if</span> <span class="nx">affinity</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">affinity</span><span class="p">.</span><span class="nx">NodeAffinity</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+      <span class="nx">nodeAffinity</span> <span class="o">:=</span> <span class="nx">affinity</span><span class="p">.</span><span class="nx">NodeAffinity</span>
+      <span class="k">if</span> <span class="nx">nodeAffinity</span><span class="p">.</span><span class="nx">RequiredDuringSchedulingIgnoredDuringExecution</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+         <span class="k">return</span> <span class="kc">true</span>
+      <span class="p">}</span>
+
+      <span class="k">if</span> <span class="nx">nodeAffinity</span><span class="p">.</span><span class="nx">RequiredDuringSchedulingIgnoredDuringExecution</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+         <span class="nx">nodeSelectorTerms</span> <span class="o">:=</span> <span class="nx">nodeAffinity</span><span class="p">.</span><span class="nx">RequiredDuringSchedulingIgnoredDuringExecution</span><span class="p">.</span><span class="nx">NodeSelectorTerms</span>
+         <span class="nx">nodeAffinityMatches</span> <span class="p">=</span> <span class="nx">nodeAffinityMatches</span> <span class="o">&amp;&amp;</span> <span class="nf">nodeMatchesNodeSelectorTerms</span><span class="p">(</span><span class="nx">node</span><span class="p">,</span> <span class="nx">nodeSelectorTerms</span><span class="p">)</span>
+      <span class="p">}</span>
+
+   <span class="p">}</span>
+   <span class="k">return</span> <span class="nx">nodeAffinityMatches</span>
+<span class="p">}</span>
+</code></pre></div><p>软性的affinity 是通过 Score 就是调度时候优选的阶段进行打分的，其实现如下：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">pl</span> <span class="o">*</span><span class="nx">NodeAffinity</span><span class="p">)</span> <span class="nf">Score</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">,</span> <span class="nx">state</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">CycleState</span><span class="p">,</span> <span class="nx">pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span><span class="p">,</span> <span class="nx">nodeName</span> <span class="kt">string</span><span class="p">)</span> <span class="p">(</span><span class="kt">int64</span><span class="p">,</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">Status</span><span class="p">)</span> <span class="p">{</span>
+	 <span class="o">...</span>
+   <span class="nx">affinity</span> <span class="o">:=</span> <span class="nx">pod</span><span class="p">.</span><span class="nx">Spec</span><span class="p">.</span><span class="nx">Affinity</span>
+
+   <span class="kd">var</span> <span class="nx">count</span> <span class="kt">int64</span>
+   <span class="k">if</span> <span class="nx">affinity</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">affinity</span><span class="p">.</span><span class="nx">NodeAffinity</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">affinity</span><span class="p">.</span><span class="nx">NodeAffinity</span><span class="p">.</span><span class="nx">PreferredDuringSchedulingIgnoredDuringExecution</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+      <span class="k">for</span> <span class="nx">i</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">affinity</span><span class="p">.</span><span class="nx">NodeAffinity</span><span class="p">.</span><span class="nx">PreferredDuringSchedulingIgnoredDuringExecution</span> <span class="p">{</span>
+         <span class="nx">preferredSchedulingTerm</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">affinity</span><span class="p">.</span><span class="nx">NodeAffinity</span><span class="p">.</span><span class="nx">PreferredDuringSchedulingIgnoredDuringExecution</span><span class="p">[</span><span class="nx">i</span><span class="p">]</span>
+         <span class="k">if</span> <span class="nx">preferredSchedulingTerm</span><span class="p">.</span><span class="nx">Weight</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+            <span class="k">continue</span>
+         <span class="p">}</span>
+        
+         <span class="nx">nodeSelector</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">v1helper</span><span class="p">.</span><span class="nf">NodeSelectorRequirementsAsSelector</span><span class="p">(</span><span class="nx">preferredSchedulingTerm</span><span class="p">.</span><span class="nx">Preference</span><span class="p">.</span><span class="nx">MatchExpressions</span><span class="p">)</span>
+         <span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+            <span class="k">return</span> <span class="mi">0</span><span class="p">,</span> <span class="nx">framework</span><span class="p">.</span><span class="nf">NewStatus</span><span class="p">(</span><span class="nx">framework</span><span class="p">.</span><span class="nx">Error</span><span class="p">,</span> <span class="nx">err</span><span class="p">.</span><span class="nf">Error</span><span class="p">())</span>
+         <span class="p">}</span>
+
+         <span class="k">if</span> <span class="nx">nodeSelector</span><span class="p">.</span><span class="nf">Matches</span><span class="p">(</span><span class="nx">labels</span><span class="p">.</span><span class="nf">Set</span><span class="p">(</span><span class="nx">node</span><span class="p">.</span><span class="nx">Labels</span><span class="p">))</span> <span class="p">{</span>
+            <span class="nx">count</span> <span class="o">+=</span> <span class="nb">int64</span><span class="p">(</span><span class="nx">preferredSchedulingTerm</span><span class="p">.</span><span class="nx">Weight</span><span class="p">)</span>
+         <span class="p">}</span>
+      <span class="p">}</span>
+   <span class="p">}</span>
+
+   <span class="k">return</span> <span class="nx">count</span><span class="p">,</span> <span class="kc">nil</span>
+<span class="p">}</span>
+</code></pre></div><p>如果没有设置 affinity，直接返回零分（不同节点分值相同），如果设置了，看一下是不是match，如果match 根据 PreferredDuringSchedulingIgnoredDuringExecution 的权重进行打分。整体上，nodeAffinity 的实现比较直观的，然后在这里也可以看出不同的 plugin 可以通过实现多个 plugin 的接口来完成更加复杂的调度逻辑。还有其他的 plugin 这里就不一一举例</p>
+<p>了。</p>
+<h3 id="registry">Registry</h3>
+<p>　　如果要自己实现一个 out-of-tree 的 scheduler，一般来说，你不需要重新实现一个 scheduler。直接调用默认的调度器，然后将我们的插件注册进去即可。在kubernetes/cmd/kube-scheduler/app/server.go 中有一个 NewSchedulerCommand 入口函数用于启动 scheduler，输入是一系列 optiion。</p>
+<p>cmd/kube-scheduler/app/server.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">Option</span> <span class="kd">func</span><span class="p">(</span><span class="nx">runtime</span><span class="p">.</span><span class="nx">Registry</span><span class="p">)</span> <span class="kt">error</span>
+
+<span class="kd">func</span> <span class="nf">NewSchedulerCommand</span><span class="p">(</span><span class="nx">registryOptions</span> <span class="o">...</span><span class="nx">Option</span><span class="p">)</span> <span class="o">*</span><span class="nx">cobra</span><span class="p">.</span><span class="nx">Command</span> <span class="p">{</span>
+   <span class="nx">opts</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">options</span><span class="p">.</span><span class="nf">NewOptions</span><span class="p">()</span>
+   <span class="o">...</span>
+<span class="p">}</span>
+<span class="o">...</span>
+<span class="kd">func</span> <span class="nf">WithPlugin</span><span class="p">(</span><span class="nx">name</span> <span class="kt">string</span><span class="p">,</span> <span class="nx">factory</span> <span class="nx">runtime</span><span class="p">.</span><span class="nx">PluginFactory</span><span class="p">)</span> <span class="nx">Option</span> <span class="p">{</span>
+	<span class="k">return</span> <span class="kd">func</span><span class="p">(</span><span class="nx">registry</span> <span class="nx">runtime</span><span class="p">.</span><span class="nx">Registry</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+		<span class="k">return</span> <span class="nx">registry</span><span class="p">.</span><span class="nf">Register</span><span class="p">(</span><span class="nx">name</span><span class="p">,</span> <span class="nx">factory</span><span class="p">)</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div><p>　　然后在同一个文件中，刚好有一个 WithPlugin 函数用于注册自己的 plugin 返回一个 option。这里 registry.Registry 中需要一个工厂函数作为参数，这个一般是一个可以返回 v1alpha1.Plugin 的初始化函数。如果一个 plugin 需要一些在集群上自定义资源协助调度，一般是在这个函数中实现 informer, clientset 的初始化，如果默认调度器的 clientset，和 informer 就能满足，那么直接把 frameworkHandle 传递进去 plugin 就可以了，nodeAffinity 就是只需要 node, pod 的信息，所以没有多余的逻辑如下：</p>
+<p>pkg/scheduler/framework/plugins/nodeaffinity/node_affinity.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">New</span><span class="p">(</span><span class="nx">_</span> <span class="nx">runtime</span><span class="p">.</span><span class="nx">Object</span><span class="p">,</span> <span class="nx">h</span> <span class="nx">framework</span><span class="p">.</span><span class="nx">FrameworkHandle</span><span class="p">)</span> <span class="p">(</span><span class="nx">framework</span><span class="p">.</span><span class="nx">Plugin</span><span class="p">,</span> <span class="kt">error</span><span class="p">)</span> <span class="p">{</span>
+   <span class="k">return</span> <span class="o">&amp;</span><span class="nx">NodeAffinity</span><span class="p">{</span><span class="nx">handle</span><span class="p">:</span> <span class="nx">h</span><span class="p">},</span> <span class="kc">nil</span>
+<span class="p">}</span>
+</code></pre></div><p>综合上述的逻辑，我们的入门函数如下图所示：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">main</span><span class="p">()</span> <span class="p">{</span>
+	<span class="nx">rand</span><span class="p">.</span><span class="nf">Seed</span><span class="p">(</span><span class="nx">time</span><span class="p">.</span><span class="nf">Now</span><span class="p">().</span><span class="nf">UnixNano</span><span class="p">())</span>
+
+	<span class="nx">command</span> <span class="o">:=</span> <span class="nx">app</span><span class="p">.</span><span class="nf">NewSchedulerCommand</span><span class="p">(</span>
+		<span class="nx">app</span><span class="p">.</span><span class="nf">WithPlugin</span><span class="p">(</span><span class="nx">sample1</span><span class="p">.</span><span class="nx">Name</span><span class="p">,</span> <span class="nx">sample1</span><span class="p">.</span><span class="nx">New</span><span class="p">),</span>
+        <span class="nx">app</span><span class="p">.</span><span class="nf">WithPlugin</span><span class="p">(</span><span class="nx">sample2</span><span class="p">.</span><span class="nx">Name</span><span class="p">,</span> <span class="nx">sample2</span><span class="p">.</span><span class="nx">New</span><span class="p">),</span>
+	<span class="p">)</span>
+    
+	<span class="nx">logs</span><span class="p">.</span><span class="nf">InitLogs</span><span class="p">()</span>
+	<span class="k">defer</span> <span class="nx">logs</span><span class="p">.</span><span class="nf">FlushLogs</span><span class="p">()</span>
+    
+	<span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">command</span><span class="p">.</span><span class="nf">Execute</span><span class="p">();</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+		<span class="nx">_</span><span class="p">,</span> <span class="nx">_</span> <span class="p">=</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Fprintf</span><span class="p">(</span><span class="nx">os</span><span class="p">.</span><span class="nx">Stderr</span><span class="p">,</span> <span class="s">&#34;%v\n&#34;</span><span class="p">,</span> <span class="nx">err</span><span class="p">)</span>
+		<span class="nx">os</span><span class="p">.</span><span class="nf">Exit</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+	<span class="p">}</span>
+
+<span class="p">}</span>
+</code></pre></div><p>然后通过编译打包部署下面scheduler-plugins的部署方式，这里就不细说了。主要注意KubeSchedulerConfiguration plugins 字段的 enable,disable 就行了，下面是scheduler-plugins 中协同调度（Coscheduling）的一个 config 的例子。</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml"><span class="k">apiVersion</span><span class="p">:</span><span class="w"> </span>kubescheduler.config.k8s.io/v1beta1<span class="w">
+</span><span class="w"></span><span class="k">kind</span><span class="p">:</span><span class="w"> </span>KubeSchedulerConfiguration<span class="w">
+</span><span class="w"></span><span class="k">leaderElection</span><span class="p">:</span><span class="w">
+</span><span class="w">  </span><span class="k">leaderElect</span><span class="p">:</span><span class="w"> </span><span class="kc">false</span><span class="w">
+</span><span class="w"></span><span class="k">clientConnection</span><span class="p">:</span><span class="w">
+</span><span class="w">  </span><span class="k">kubeconfig</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;REPLACE_ME_WITH_KUBE_CONFIG_PATH&#34;</span><span class="w">
+</span><span class="w"></span><span class="k">profiles</span><span class="p">:</span><span class="w">
+</span><span class="w"></span>- <span class="k">schedulerName</span><span class="p">:</span><span class="w"> </span>default-scheduler<span class="w">
+</span><span class="w">  </span><span class="k">plugins</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="k">queueSort</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span><span class="k">enabled</span><span class="p">:</span><span class="w">
+</span><span class="w">        </span>- <span class="k">name</span><span class="p">:</span><span class="w"> </span>Coscheduling<span class="w">
+</span><span class="w">      </span><span class="k">disabled</span><span class="p">:</span><span class="w">
+</span><span class="w">        </span>- <span class="k">name</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;*&#34;</span><span class="w">
+</span><span class="w">    </span><span class="k">preFilter</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span><span class="k">enabled</span><span class="p">:</span><span class="w">
+</span><span class="w">        </span>- <span class="k">name</span><span class="p">:</span><span class="w"> </span>Coscheduling<span class="w">
+</span><span class="w">    </span><span class="k">permit</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span><span class="k">enabled</span><span class="p">:</span><span class="w">
+</span><span class="w">        </span>- <span class="k">name</span><span class="p">:</span><span class="w"> </span>Coscheduling<span class="w">
+</span><span class="w">    </span><span class="k">reserve</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span><span class="k">enabled</span><span class="p">:</span><span class="w">
+</span><span class="w">        </span>- <span class="k">name</span><span class="p">:</span><span class="w"> </span>Coscheduling<span class="w">
+</span><span class="w">    </span><span class="k">postBind</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span><span class="k">enabled</span><span class="p">:</span><span class="w">
+</span><span class="w">        </span>- <span class="k">name</span><span class="p">:</span><span class="w"> </span>Coscheduling<span class="w">
+</span></code></pre></div><h3 id="scheduler-plugins">Scheduler-plugins</h3>
+<p>　　另外，关于 scheduler-framework，如果感兴趣还可以参考 kubernetes-sigs 的 scheduler 兴趣小组 维护的 <a href="https://github.com/kubernetes-sigs/scheduler-plugins" target="_blank" rel="noopener noreffer">scheduler-plugins</a>，方便通过 scheduler framework 对 kubernetes 的调度器进行改进和增强。 上面已经实现了一些比较常用调度的 plugins，如：协同调度 （coscheduling，主要是保证多个 pod 启动运行一致）和容量调度（capacityscheduling，主要是引入弹性的resourceQuata）等，可以对照着来优化自己的调度器。</p>
+<h2 id="总结">总结</h2>
+<p>​　　Scheduler-framework 在很大程度上解决了 kubernetes 对调度日益增长的个性化需求，</p>
+<p>不需要开发者改动调度器主逻辑，只提供改造的位点。不再需要开发者通过自研的方式维护独立的调度器，同时保证对后续 Kubernetes 版本升级的兼容性。另外，随着 scheduler framework 引入，之前通过 extender 扩展调度器的方式已经被弃用了，原因很简单：一个是调用 Extender 的接口是 HTTP 请求，受到网络环境的影响，性能远低于本地的函数调用。同时每次调用都需要将 Pod 和 Node 的信息进行 marshaling 和 unmarshalling 的操作，会进一步降低性能；其次用户可以扩展的点比较有限，位置比较固定，无法支持灵活的扩展，例如只能在执行完默认的 Filter 策略后才能调用，scheduler framework 可以实现完全的替代。</p>
+<p>​		最后，对 kubernetes scheduler 的扩展还可以通过多调度器的方式实现，如果有时间会在后面的文章中聊一下 volcano 和 kube-batch。</p>
+<h2 id="reference">Reference</h2>
+<p><a href="https://kubernetes.io/docs/concepts/scheduling-eviction/scheduling-framework" target="_blank" rel="noopener noreffer">Kubenetes文档：调度框架</a></p>
+<p><a href="https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/" target="_blank" rel="noopener noreffer">Kubenetes文档：将 Pod 分配给节点</a></p>
+<p><a href="https://github.com/kubernetes/enhancements/tree/master/keps/sig-scheduling/624-scheduling-framework" target="_blank" rel="noopener noreffer">scheduler framework 提案</a></p>
+<p><a href="https://www.qikqiak.com/post/custom-kube-scheduler" target="_blank" rel="noopener noreffer">自定义 Kubernetes 调度器</a></p>
+<p><a href="https://mp.weixin.qq.com/s/TApLhFDTXk5W8-ohmL719g" target="_blank" rel="noopener noreffer">上车了！一文尽览Scheduling Framework 应用实践</a></p>
+<p><a href="https://mp.weixin.qq.com/s/GbrYl6D1JFC2MllM1XNPTw" target="_blank" rel="noopener noreffer">Kubernetes调度由浅入深：框架</a></p>
+<p><a href="https://developer.aliyun.com/article/767049" target="_blank" rel="noopener noreffer">进击的 Kubernetes 调度系统（一）：Kubernetes scheduling framework</a></p>
+<p><a href="https://developer.aliyun.com/article/767853" target="_blank" rel="noopener noreffer">进击的 Kubernetes 调度系统（二）：支持批任务的 Coscheduling/Gang scheduling</a></p>
+<p><a href="https://developer.aliyun.com/article/770336" target="_blank" rel="noopener noreffer">进击的Kubernetes调度系统（三）：支持批任务的Binpack Scheduling</a></p>
+</div><div class="post-footer" id="post-footer">
+    <div class="post-info">
+        <div class="post-info-line">
+            <div class="post-info-mod">
+                <span>更新于 2021-01-29</span>
+            </div>
+            <div class="post-info-license"></div>
+        </div>
+        <div class="post-info-line">
+            <div class="post-info-md"></div>
+            <div class="post-info-share">
+                <span></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-info-more">
+        <section class="post-tags"></section>
+        <section>
+            <span><a href="javascript:void(0);" onclick="window.history.back();">返回</a></span>&nbsp;|&nbsp;<span><a href="/">主页</a></span>
+        </section>
+    </div>
+
+    <div class="post-nav"><a href="/posts/scheduler_public/" class="prev" rel="prev" title="Kubernetes Scheduler 源码分析"><i class="fas fa-angle-left fa-fw"></i>Kubernetes Scheduler 源码分析</a>
+            <a href="/posts/volcano_public/" class="next" rel="next" title="Volcano 批调度器源码分析">Volcano 批调度器源码分析<i class="fas fa-angle-right fa-fw"></i></a></div>
+</div>
+</article></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line">由 <a href="https://gohugo.io/" target="_blank" rel="noopener noreffer" title="Hugo 0.74.1">Hugo</a> 强力驱动 | 主题 - <a href="https://github.com/dillonzq/LoveIt" target="_blank" rel="noopener noreffer" title="LoveIt 0.2.10"><i class="far fa-kiss-wink-heart fa-fw"></i> LoveIt</a>
+                </div><div class="footer-line"><i class="far fa-copyright fa-fw"></i><span itemprop="copyrightYear">2021</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank"></a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="回到顶部">
+                <i class="fas fa-arrow-up fa-fw"></i>
+            </a><a href="#" id="view-comments" class="fixed-button" title="查看评论">
+                <i class="fas fa-comment fa-fw"></i>
+            </a>
+        </div><script type="text/javascript" src="/lib/smooth-scroll/smooth-scroll.min.js"></script><script type="text/javascript" src="/lib/lazysizes/lazysizes.min.js"></script><script type="text/javascript" src="/lib/clipboard/clipboard.min.js"></script><script type="text/javascript">window.config={"code":{"copyTitle":"复制到剪贴板","maxShownLines":10},"comment":{}};</script><script type="text/javascript" src="/js/theme.min.js"></script></body>
+</html>

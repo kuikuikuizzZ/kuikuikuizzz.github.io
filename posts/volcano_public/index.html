@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+        <title>Volcano 批调度器源码分析 - 打怪實錄</title><meta name="Description" content=""><meta property="og:title" content="Volcano 批调度器源码分析" />
+<meta property="og:description" content="Volcano（scheduler 03） 介绍 ​ 除了前面聊到的通过 scheduler framework 对 kubernetes 的调度特性进行扩展之外，还可以通过多调度器的方式进行扩展，因为我自己" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://kuikuikuizzz.github.io/posts/volcano_public/" />
+<meta property="article:published_time" content="2021-02-06T11:06:54+08:00" />
+<meta property="article:modified_time" content="2021-02-06T11:06:54+08:00" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Volcano 批调度器源码分析"/>
+<meta name="twitter:description" content="Volcano（scheduler 03） 介绍 ​ 除了前面聊到的通过 scheduler framework 对 kubernetes 的调度特性进行扩展之外，还可以通过多调度器的方式进行扩展，因为我自己"/>
+<meta name="application-name" content="打怪實錄">
+<meta name="apple-mobile-web-app-title" content="打怪實錄"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="https://kuikuikuizzz.github.io/posts/volcano_public/" /><link rel="prev" href="https://kuikuikuizzz.github.io/posts/scheduler_framework/" /><link rel="stylesheet" href="/lib/normalize/normalize.min.css"><link rel="stylesheet" href="/css/style.min.css"><link rel="stylesheet" href="/lib/fontawesome-free/all.min.css"><link rel="stylesheet" href="/lib/animate/animate.min.css"><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "Volcano 批调度器源码分析",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "https:\/\/kuikuikuizzz.github.io\/posts\/volcano_public\/"
+        },"genre": "posts","wordcount":  6478 ,
+        "url": "https:\/\/kuikuikuizzz.github.io\/posts\/volcano_public\/","datePublished": "2021-02-06T11:06:54+08:00","dateModified": "2021-02-06T11:06:54+08:00","publisher": {
+            "@type": "Organization",
+            "name": "kuikuikuizzZ"},"author": {
+                "@type": "Person",
+                "name": "kuikuikuizzZ"
+            },"description": ""
+    }
+    </script></head>
+    <body header-desktop="" header-mobile=""><script type="text/javascript">(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : '' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="打怪實錄">打怪實錄</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/categories/"> 分类 </a><span class="menu-item delimiter"></span><a href="javascript:void(0);" class="menu-item theme-switch" title="切换主题">
+                    <i class="fas fa-adjust fa-fw"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="打怪實錄">打怪實錄</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/categories/" title="">分类</a><a href="javascript:void(0);" class="menu-item theme-switch" title="切换主题">
+                <i class="fas fa-adjust fa-fw"></i>
+            </a></div>
+    </div>
+</header>
+<div class="search-dropdown desktop">
+    <div id="search-dropdown-desktop"></div>
+</div>
+<div class="search-dropdown mobile">
+    <div id="search-dropdown-mobile"></div>
+</div>
+<main class="main">
+                <div class="container"><div class="toc" id="toc-auto">
+            <h2 class="toc-title">目录</h2>
+            <div class="toc-content" id="toc-content-auto"></div>
+        </div><article class="page single"><h1 class="single-title animated flipInX">Volcano 批调度器源码分析</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel=" author" class="author"><i class="fas fa-user-circle fa-fw"></i>kuikuikuizzZ</a></span></div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw"></i>&nbsp;<time datetime="2021-02-06">2021-02-06</time>&nbsp;<i class="fas fa-pencil-alt fa-fw"></i>&nbsp;约 6478 字&nbsp;
+                <i class="far fa-clock fa-fw"></i>&nbsp;预计阅读 13 分钟&nbsp;</div>
+        </div><div class="details toc" id="toc-static"  kept="">
+                <div class="details-summary toc-title">
+                    <span>目录</span>
+                    <span><i class="details-icon fas fa-angle-right"></i></span>
+                </div>
+                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents">
+  <ul>
+    <li><a href="#介绍">介绍</a></li>
+    <li><a href="#流程分析">流程分析</a>
+      <ul>
+        <li><a href="#创建job">创建job</a></li>
+        <li><a href="#同步信息">同步信息</a></li>
+        <li><a href="#调度">调度</a></li>
+        <li><a href="#plugin机制">Plugin机制</a></li>
+      </ul>
+    </li>
+    <li><a href="#总结">总结</a></li>
+    <li><a href="#参考">参考</a></li>
+  </ul>
+</nav></div>
+            </div><div class="content" id="content"><h1 id="volcanoscheduler-03">Volcano（scheduler 03）</h1>
+<h2 id="介绍">介绍</h2>
+<p>​　　除了前面聊到的通过 scheduler framework 对 kubernetes 的调度特性进行扩展之外，还可以通过多调度器的方式进行扩展，因为我自己的背景关系，会比较关注跟机器学习工作负载相关的的调度器，现在社区比较成熟的方案有 kube-batch，和由其延伸出来的 volcano，主要是补足了 kubernetes 批调度的短板，其社区也比较活跃。</p>
+<p>​　　因为 volcano 是植根于 kube-batch，不过添加了更加多的 feature（如提供了一个 controller Manager 用于管理 volcano 自己可扩展的 job CRD 和 queue，podgroup 等资源，还有一系列命令行工具），而 kube-batch 主要以批调度器为主，这篇文章会着重于从源码的角度分析 volcano，中间如果有需要会穿插跟 kube-batch 的异同。文章组织上，我自己想从创建一个 volcano 的 job 开始，逐步对其调度流程进行分析。为了讲述和复现的方便，我们这里源码是根据 volcano v1.1.0 的版本进行分析的。</p>
+<h2 id="流程分析">流程分析</h2>
+<p>　　使用 volcano 的调度流程如下，具体分 5 步，我们后面会着重去分析第2，3步的作业处理。</p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="volcano.png"
+        data-srcset="/posts/volcano_public/volcano.png, volcano.png 1.5x, /posts/volcano_public/volcano.png 2x"
+        data-sizes="auto"
+        alt="/posts/volcano_public/volcano.png"
+        title="volcano" /></p>
+<ul>
+<li>使用 kubectl 创建一个 volcano job。</li>
+<li>vc-controller 监测到这个 job 的创建，会创建对应的 pod 和 podgroup。</li>
+<li>通过 vc-scheduler 找到合适的 node</li>
+<li>向 api-server 申请 pod 和 node 的绑定</li>
+<li>kubelet 看到有 pod 进行绑定，启动容器。</li>
+</ul>
+<h3 id="创建job">创建job</h3>
+<p>我们以 examples 中的 tensorflow 例子来分析创建 job 的主流程：</p>
+<p>example/integrations/tensorflow/dist-mnist/tf-dist-mnist-example.yaml</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml"><span class="k">apiVersion</span><span class="p">:</span><span class="w"> </span>batch.volcano.sh/v1alpha1<span class="w">
+</span><span class="w"></span><span class="k">kind</span><span class="p">:</span><span class="w"> </span>Job<span class="w">
+</span><span class="w"></span><span class="k">metadata</span><span class="p">:</span><span class="w">
+</span><span class="w">  </span><span class="k">name</span><span class="p">:</span><span class="w"> </span>tensorflow-benchmark<span class="w">
+</span><span class="w">  </span><span class="k">labels</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="k">&#34;volcano.sh/job-type&#34;: </span><span class="s2">&#34;Tensorflow&#34;</span><span class="w">
+</span><span class="w"></span><span class="k">spec</span><span class="p">:</span><span class="w">
+</span><span class="w">  </span><span class="k">minAvailable</span><span class="p">:</span><span class="w"> </span><span class="m">3</span><span class="w">
+</span><span class="w">  </span><span class="k">schedulerName</span><span class="p">:</span><span class="w"> </span>volcano<span class="w">
+</span><span class="w">  </span><span class="k">plugins</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="k">env</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="w">
+</span><span class="w">    </span><span class="k">svc</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span><span class="w">
+</span><span class="w">  </span><span class="k">policies</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span>- <span class="k">event</span><span class="p">:</span><span class="w"> </span>PodEvicted<span class="w">
+</span><span class="w">      </span><span class="k">action</span><span class="p">:</span><span class="w"> </span>RestartJob<span class="w">
+</span><span class="w">  </span><span class="k">tasks</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span>- <span class="k">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span><span class="w">      </span><span class="k">name</span><span class="p">:</span><span class="w"> </span>ps<span class="w">
+</span><span class="w">      </span><span class="k">template</span><span class="p">:</span><span class="w">
+</span><span class="w">        </span><span class="k">spec</span><span class="p">:</span><span class="w">
+</span><span class="w">          </span><span class="k">imagePullSecrets</span><span class="p">:</span><span class="w">
+</span><span class="w">            </span>- <span class="k">name</span><span class="p">:</span><span class="w"> </span>default-secret<span class="w">
+</span><span class="w">          </span><span class="k">containers</span><span class="p">:</span><span class="w">
+</span><span class="w">            </span>- <span class="k">command</span><span class="p">:</span><span class="w">
+</span><span class="w">                </span>- sh<span class="w">
+</span><span class="w">                </span>- -c<span class="w">
+</span><span class="w">                </span>- <span class="sd">|
+</span><span class="sd">                  PS_HOST=`cat /etc/volcano/ps.host | sed &#39;s/$/&amp;:2222/g&#39; | tr &#34;\n&#34; &#34;,&#34;`;</span><span class="w">
+</span><span class="w">                  </span>WORKER_HOST=`cat<span class="w"> </span>/etc/volcano/worker.host<span class="w"> </span>|<span class="w"> </span>sed<span class="w"> </span><span class="s1">&#39;s/$/&amp;:2222/g&#39;</span><span class="w"> </span>|<span class="w"> </span>tr<span class="w"> </span><span class="s2">&#34;\n&#34;</span><span class="w"> </span><span class="s2">&#34;,&#34;</span>`;<span class="w">
+</span><span class="w">                  </span>python<span class="w"> </span>tf_cnn_benchmarks.py<span class="w"> </span>--batch_size=<span class="m">32</span><span class="w"> </span>--model=resnet50<span class="w"> </span>--variable_update=parameter_server<span class="w"> </span>--flush_stdout=<span class="kc">true</span><span class="w"> </span>--num_gpus=<span class="m">1</span><span class="w"> </span>--local_parameter_device=cpu<span class="w"> </span>--device=cpu<span class="w"> </span>--data_format=NHWC<span class="w"> </span>--job_name=ps<span class="w"> </span>--task_index=${VK_TASK_INDEX}<span class="w"> </span>--ps_hosts=${PS_HOST}<span class="w"> </span>--worker_hosts=${WORKER_HOST}<span class="w">
+</span><span class="w">              </span><span class="k">image</span><span class="p">:</span><span class="w"> </span>volcanosh/example-tf<span class="p">:</span><span class="m">0.0.1</span><span class="w">
+</span><span class="w">              </span><span class="k">name</span><span class="p">:</span><span class="w"> </span>tensorflow<span class="w">
+</span><span class="w">              </span><span class="k">ports</span><span class="p">:</span><span class="w">
+</span><span class="w">                </span>- <span class="k">containerPort</span><span class="p">:</span><span class="w"> </span><span class="m">2222</span><span class="w">
+</span><span class="w">                  </span><span class="k">name</span><span class="p">:</span><span class="w"> </span>tfjob-port<span class="w">
+</span><span class="w">              </span><span class="k">resources</span><span class="p">:</span><span class="w">
+</span><span class="w">                </span><span class="k">requests</span><span class="p">:</span><span class="w">
+</span><span class="w">                  </span><span class="k">cpu</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1000m&#34;</span><span class="w">
+</span><span class="w">                  </span><span class="k">memory</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;2048Mi&#34;</span><span class="w">
+</span><span class="w">                </span><span class="k">limits</span><span class="p">:</span><span class="w">
+</span><span class="w">                  </span><span class="k">cpu</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;1000m&#34;</span><span class="w">
+</span><span class="w">                  </span><span class="k">memory</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;2048Mi&#34;</span><span class="w">
+</span><span class="w">              </span><span class="k">workingDir</span><span class="p">:</span><span class="w"> </span>/opt/tf-benchmarks/scripts/tf_cnn_benchmarks<span class="w">
+</span><span class="w">          </span><span class="k">restartPolicy</span><span class="p">:</span><span class="w"> </span>OnFailure<span class="w">
+</span><span class="w">    </span>- <span class="k">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span><span class="w">      </span><span class="k">name</span><span class="p">:</span><span class="w"> </span>worker<span class="w">
+</span><span class="w">      </span><span class="k">policies</span><span class="p">:</span><span class="w">
+</span><span class="w">        </span>- <span class="k">event</span><span class="p">:</span><span class="w"> </span>TaskCompleted<span class="w">
+</span><span class="w">          </span><span class="k">action</span><span class="p">:</span><span class="w"> </span>CompleteJob<span class="w">
+</span><span class="w">      </span><span class="k">template</span><span class="p">:</span><span class="w">
+</span><span class="w">        </span><span class="k">spec</span><span class="p">:</span><span class="w">
+</span><span class="w">          </span><span class="k">imagePullSecrets</span><span class="p">:</span><span class="w">
+</span><span class="w">            </span>- <span class="k">name</span><span class="p">:</span><span class="w"> </span>default-secret<span class="w">
+</span><span class="w">          </span><span class="k">containers</span><span class="p">:</span><span class="w">
+</span><span class="w">            </span>- <span class="k">command</span><span class="p">:</span><span class="w">
+</span><span class="w">                </span>- sh<span class="w">
+</span><span class="w">                </span>- -c<span class="w">
+</span><span class="w">                </span>- <span class="sd">|
+</span><span class="sd">                  PS_HOST=`cat /etc/volcano/ps.host | sed &#39;s/$/&amp;:2222/g&#39; | tr &#34;\n&#34; &#34;,&#34;`;</span><span class="w">
+</span><span class="w">                  </span>WORKER_HOST=`cat<span class="w"> </span>/etc/volcano/worker.host<span class="w"> </span>|<span class="w"> </span>sed<span class="w"> </span><span class="s1">&#39;s/$/&amp;:2222/g&#39;</span><span class="w"> </span>|<span class="w"> </span>tr<span class="w"> </span><span class="s2">&#34;\n&#34;</span><span class="w"> </span><span class="s2">&#34;,&#34;</span>`;<span class="w">
+</span><span class="w">                  </span>python<span class="w"> </span>tf_cnn_benchmarks.py<span class="w"> </span>--batch_size=<span class="m">32</span><span class="w"> </span>--model=resnet50<span class="w"> </span>--variable_update=parameter_server<span class="w"> </span>--flush_stdout=<span class="kc">true</span><span class="w"> </span>--num_gpus=<span class="m">1</span><span class="w"> </span>--local_parameter_device=cpu<span class="w"> </span>--device=cpu<span class="w"> </span>--data_format=NHWC<span class="w"> </span>--job_name=worker<span class="w"> </span>--task_index=${VK_TASK_INDEX}<span class="w"> </span>--ps_hosts=${PS_HOST}<span class="w"> </span>--worker_hosts=${WORKER_HOST}<span class="w">
+</span><span class="w">              </span><span class="k">image</span><span class="p">:</span><span class="w"> </span>volcanosh/example-tf<span class="p">:</span><span class="m">0.0.1</span><span class="w">
+</span><span class="w">              </span><span class="k">name</span><span class="p">:</span><span class="w"> </span>tensorflow<span class="w">
+</span><span class="w">              </span><span class="k">ports</span><span class="p">:</span><span class="w">
+</span><span class="w">                </span>- <span class="k">containerPort</span><span class="p">:</span><span class="w"> </span><span class="m">2222</span><span class="w">
+</span><span class="w">                  </span><span class="k">name</span><span class="p">:</span><span class="w"> </span>tfjob-port<span class="w">
+</span><span class="w">              </span><span class="k">resources</span><span class="p">:</span><span class="w">
+</span><span class="w">                </span><span class="k">requests</span><span class="p">:</span><span class="w">
+</span><span class="w">                  </span><span class="k">cpu</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;2000m&#34;</span><span class="w">
+</span><span class="w">                  </span><span class="k">memory</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;2048Mi&#34;</span><span class="w">
+</span><span class="w">                </span><span class="k">limits</span><span class="p">:</span><span class="w">
+</span><span class="w">                  </span><span class="k">cpu</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;2000m&#34;</span><span class="w">
+</span><span class="w">                  </span><span class="k">memory</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;4096Mi&#34;</span><span class="w">
+</span><span class="w">              </span><span class="k">workingDir</span><span class="p">:</span><span class="w"> </span>/opt/tf-benchmarks/scripts/tf_cnn_benchmarks<span class="w">
+</span><span class="w">          </span><span class="k">restartPolicy</span><span class="p">:</span><span class="w"> </span>OnFailure<span class="w">
+</span></code></pre></div><p>如果 volcano 已经部署，这个 job 会被 controller-manager 中的 job controller 监测到，如果 job 自身的状态没有问题，会进入 pkg/controllers/job/job_controller_actions.go 中 syncJob 的逻辑，然后 job  controller 会做以下几件事：</p>
+<ul>
+<li>initiate Job：主要是把注册的 plugins 作用到这个 job 上。</li>
+<li>创建这个 job 对应的 podgroup (默认使用 volcanoJob 都会创建），然后用 job.spec.minAvailable 填写 podgroup 的minAvailable 字段。</li>
+<li>然后根据 job 中的 template 异步创建对应的 pod，也会把对应的 plugin 等信息添加上。</li>
+<li>最后 updateJobStatus。</li>
+</ul>
+<p>现在集群中有这个 job 对应的 pod，和 podgroup 了。</p>
+<h4 id="volcanojobvsbatchv1job">volcanojobVSbatch/v1Job</h4>
+<p>　　上面聊到的 volcano job（pkg/apis/batch/v1alpha1/job.go） 对比 kubernetes 下 batch/v1的 job， 主要有以下区别：</p>
+<ul>
+<li>volcano job 会多了 SchedulerName，MinAvailable， Queue 等字段，主要是为了更契合 volcano 的调度方式。</li>
+<li>使用  []TaskSpec，替代 PodTemplateSpec 作为 pod 实例的模板，因为一个 taskSpec 有一个 PodTemplateSpec，可以支持多种实例，这个跟 kubeflow 的 CRDjobs (tfjob,pytorchjob) 是比较类似的。</li>
+<li>Plugins 字段主要是方便做一些 mutating，如注入 env，ssh 等。</li>
+</ul>
+<p>下面是 volcano job 的定义：(pkg/apis/batch/v1alpha1/job.go)</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="c1">// Job defines the volcano job.
+</span><span class="c1"></span><span class="kd">type</span> <span class="nx">Job</span> <span class="kd">struct</span> <span class="p">{</span>
+   <span class="nx">metav1</span><span class="p">.</span><span class="nx">TypeMeta</span> <span class="s">`json:&#34;,inline&#34;`</span>
+
+   <span class="nx">metav1</span><span class="p">.</span><span class="nx">ObjectMeta</span> <span class="s">`json:&#34;metadata,omitempty&#34; protobuf:&#34;bytes,1,opt,name=metadata&#34;`</span>
+
+   <span class="nx">Spec</span> <span class="nx">JobSpec</span> <span class="s">`json:&#34;spec,omitempty&#34; protobuf:&#34;bytes,2,opt,name=spec&#34;`</span>
+
+   <span class="nx">Status</span> <span class="nx">JobStatus</span> <span class="s">`json:&#34;status,omitempty&#34; protobuf:&#34;bytes,3,opt,name=status&#34;`</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">JobSpec</span> <span class="kd">struct</span> <span class="p">{</span>
+   <span class="nx">SchedulerName</span> <span class="kt">string</span> <span class="s">`json:&#34;schedulerName,omitempty&#34; protobuf:&#34;bytes,1,opt,name=schedulerName&#34;`</span>
+
+   <span class="nx">MinAvailable</span> <span class="kt">int32</span> <span class="s">`json:&#34;minAvailable,omitempty&#34; protobuf:&#34;bytes,2,opt,name=minAvailable&#34;`</span>
+
+   <span class="nx">Volumes</span> <span class="p">[]</span><span class="nx">VolumeSpec</span> <span class="s">`json:&#34;volumes,omitempty&#34; protobuf:&#34;bytes,3,opt,name=volumes&#34;`</span>
+
+   <span class="nx">Tasks</span> <span class="p">[]</span><span class="nx">TaskSpec</span> <span class="s">`json:&#34;tasks,omitempty&#34; protobuf:&#34;bytes,4,opt,name=tasks&#34;`</span>
+
+   <span class="nx">Policies</span> <span class="p">[]</span><span class="nx">LifecyclePolicy</span> <span class="s">`json:&#34;policies,omitempty&#34; protobuf:&#34;bytes,5,opt,name=policies&#34;`</span>
+
+   <span class="nx">Plugins</span> <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">][]</span><span class="kt">string</span> <span class="s">`json:&#34;plugins,omitempty&#34; protobuf:&#34;bytes,6,opt,name=plugins&#34;`</span>
+
+   <span class="nx">RunningEstimate</span> <span class="o">*</span><span class="nx">metav1</span><span class="p">.</span><span class="nx">Duration</span> <span class="s">`json:&#34;runningEstimate,omitempty&#34; protobuf:&#34;bytes,4,opt,name=runningEstimate&#34;`</span>
+
+   <span class="nx">Queue</span> <span class="kt">string</span> <span class="s">`json:&#34;queue,omitempty&#34; protobuf:&#34;bytes,7,opt,name=queue&#34;`</span>
+
+   <span class="nx">MaxRetry</span> <span class="kt">int32</span> <span class="s">`json:&#34;maxRetry,omitempty&#34; protobuf:&#34;bytes,8,opt,name=maxRetry&#34;`</span>
+
+   <span class="nx">TTLSecondsAfterFinished</span> <span class="o">*</span><span class="kt">int32</span> <span class="s">`json:&#34;ttlSecondsAfterFinished,omitempty&#34; protobuf:&#34;varint,9,opt,name=ttlSecondsAfterFinished&#34;`</span>
+
+   <span class="nx">PriorityClassName</span> <span class="kt">string</span> <span class="s">`json:&#34;priorityClassName,omitempty&#34; protobuf:&#34;bytes,10,opt,name=priorityClassName&#34;`</span>
+<span class="p">}</span>
+<span class="kd">type</span> <span class="nx">TaskSpec</span> <span class="kd">struct</span> <span class="p">{</span>
+
+	<span class="nx">Name</span> <span class="kt">string</span> <span class="s">`json:&#34;name,omitempty&#34; protobuf:&#34;bytes,1,opt,name=name&#34;`</span>
+
+	<span class="nx">Replicas</span> <span class="kt">int32</span> <span class="s">`json:&#34;replicas,omitempty&#34; protobuf:&#34;bytes,2,opt,name=replicas&#34;`</span>
+
+	<span class="nx">Template</span> <span class="nx">v1</span><span class="p">.</span><span class="nx">PodTemplateSpec</span> <span class="s">`json:&#34;template,omitempty&#34; protobuf:&#34;bytes,3,opt,name=template&#34;`</span>
+
+	<span class="nx">Policies</span> <span class="p">[]</span><span class="nx">LifecyclePolicy</span> <span class="s">`json:&#34;policies,omitempty&#34; protobuf:&#34;bytes,4,opt,name=policies&#34;`</span>
+<span class="p">}</span>
+
+</code></pre></div><h4 id="volcanojobvscrdjob">volcanojobVSCRDjob</h4>
+<p>　　另外，从上面流程分析可以看到，volcano job controller 同步之后主要是创建了 pod 和 podgroup，然后 volcano 的 scheduler 也不会单独去 watch volcanojob，所以后续调度流程主要就是通过 pod，podgroup 的信息来实现的，job controller 只会同步一下 status。这样也给开发者带来了灵活性，其他的 CRD jobs 也可以通过这样的机制，让自己的 CRD jobs 使用 volcano 调度起来，具体可能还需要 podgroup controller 的协助，实例如下图。具体可以参考一下，<a href="https://github.com/kubeflow/tf-operator" target="_blank" rel="noopener noreffer">tf-operator</a> 的实现这里就不展开了。</p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="crdjob.png"
+        data-srcset="/posts/volcano_public/crdjob.png, crdjob.png 1.5x, /posts/volcano_public/crdjob.png 2x"
+        data-sizes="auto"
+        alt="/posts/volcano_public/crdjob.png"
+        title="crdjob" /></p>
+<p><strong>总结</strong>：这一步 job controller 通过 job 的模板信息创建了对应的 pod 和 podgroup。</p>
+<h3 id="同步信息">同步信息</h3>
+<p>　　上面的步骤创建了 volcanojob 对应的 pod，和 podgroup，会直接被 scheduler 监测到，然后触发 podInformer，podgroupInformer 的 addPod 和 addPodGroupV1beta1  eventHandler。</p>
+<p>其中 AddPod 会干以下几件事：</p>
+<ul>
+<li>对 pod 生成一个对应的 taskInfo，并生成一个 jobID。</li>
+<li>如果在 schedulerCache 的 jobs 没有这个 jobID，创建这个 jobInfo，然后把这个 task 放到 job.Tasks 中。</li>
+<li>如果已经分配了 node，也会在 schedulerCache的 nodes 里面记录这个task。</li>
+</ul>
+<p>如果是触发了AddPodGroupV1beta1 会做以下几件事：</p>
+<ul>
+<li>也会找schedulerCache jobs 里面有没有这个 podgroup 对应的 job，没有就创建一下。</li>
+<li>然后把 podgroup 的信息（MinAvailable，Queue）等传递给 JobInfo</li>
+</ul>
+<p>可以认为看到pod，podgroup 的创建，eventHandler 会在 schedulerCache 的 jobs 增加一个对应 jobInfo。</p>
+<h4 id="scheduler初始化">scheduler初始化</h4>
+<p>　　上面提到了 taskInfo, JobInfo, nodeInfo 等概念，这里作一下说明，顺便也对 scheduler 的启动做一些分析。</p>
+<p>scheduler 的入口是通过 cmd/scheduler/main.go，调用 cmd/scheduler/app/server.go 的 Run 函数启动的。下面截取了 Run 函数比较重要的部分，主要是调用 NewScheduler，启动一个scheduler，然后调用 scheduler.Run 函数运行。</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">Run</span><span class="p">(</span><span class="nx">opt</span> <span class="o">*</span><span class="nx">options</span><span class="p">.</span><span class="nx">ServerOption</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+  
+   <span class="nx">config</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">kube</span><span class="p">.</span><span class="nf">BuildConfig</span><span class="p">(</span><span class="nx">opt</span><span class="p">.</span><span class="nx">KubeClientOptions</span><span class="p">)</span>
+   <span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="nx">err</span>
+   <span class="p">}</span>
+
+   <span class="nx">sched</span><span class="p">,</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">scheduler</span><span class="p">.</span><span class="nf">NewScheduler</span><span class="p">(</span><span class="nx">config</span><span class="p">,</span>
+      <span class="nx">opt</span><span class="p">.</span><span class="nx">SchedulerName</span><span class="p">,</span>
+      <span class="nx">opt</span><span class="p">.</span><span class="nx">SchedulerConf</span><span class="p">,</span>
+      <span class="nx">opt</span><span class="p">.</span><span class="nx">SchedulePeriod</span><span class="p">,</span>
+      <span class="nx">opt</span><span class="p">.</span><span class="nx">DefaultQueue</span><span class="p">)</span>
+   <span class="k">if</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+      <span class="nb">panic</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span>
+   <span class="p">}</span>
+
+	 <span class="o">...</span> <span class="c1">// StartHealthz 
+</span><span class="c1"></span>
+   <span class="nx">run</span> <span class="o">:=</span> <span class="kd">func</span><span class="p">(</span><span class="nx">ctx</span> <span class="nx">context</span><span class="p">.</span><span class="nx">Context</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">sched</span><span class="p">.</span><span class="nf">Run</span><span class="p">(</span><span class="nx">ctx</span><span class="p">.</span><span class="nf">Done</span><span class="p">())</span>
+      <span class="o">&lt;-</span><span class="nx">ctx</span><span class="p">.</span><span class="nf">Done</span><span class="p">()</span>
+   <span class="p">}</span>
+
+   <span class="k">if</span> <span class="p">!</span><span class="nx">opt</span><span class="p">.</span><span class="nx">EnableLeaderElection</span> <span class="p">{</span>
+      <span class="nf">run</span><span class="p">(</span><span class="nx">context</span><span class="p">.</span><span class="nf">TODO</span><span class="p">())</span>
+      <span class="k">return</span> <span class="nx">fmt</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="s">&#34;finished without leader elect&#34;</span><span class="p">)</span>
+   <span class="p">}</span>
+   <span class="o">...</span> <span class="c1">// EnableLeaderElection Do
+</span><span class="c1"></span><span class="p">}</span>
+</code></pre></div><p>NewScheduler 会通过 schedcache.New 调用 pkg/scheduler/cache/cache.go 下的newSchedulerCache。这个函数主要做了几件事：</p>
+<ul>
+<li>初始化各个 client。</li>
+<li>初始化各个 informer。</li>
+<li>通过初始化的 informer 注册各个 eventHandler，上面 AddPod, 和 AddPodGroupV1beta1 也是在这里注册。</li>
+<li>利用上面初始化的信息初始化SchedulerCache。</li>
+</ul>
+<p>SchedulerCache 的定义如下：</p>
+<p>pkg/scheduler/cache/cache.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="c1">// SchedulerCache cache for the kube batch
+</span><span class="c1"></span><span class="kd">type</span> <span class="nx">SchedulerCache</span> <span class="kd">struct</span> <span class="p">{</span>
+   <span class="nx">sync</span><span class="p">.</span><span class="nx">Mutex</span>
+
+   <span class="nx">kubeClient</span> <span class="o">*</span><span class="nx">kubernetes</span><span class="p">.</span><span class="nx">Clientset</span>
+   <span class="nx">vcClient</span>   <span class="o">*</span><span class="nx">vcclient</span><span class="p">.</span><span class="nx">Clientset</span>
+
+   <span class="nx">defaultQueue</span> <span class="kt">string</span>
+   <span class="c1">// schedulerName is the name for volcano scheduler
+</span><span class="c1"></span>   <span class="nx">schedulerName</span> <span class="kt">string</span>
+
+   <span class="nx">podInformer</span>             <span class="nx">infov1</span><span class="p">.</span><span class="nx">PodInformer</span>
+   <span class="nx">nodeInformer</span>            <span class="nx">infov1</span><span class="p">.</span><span class="nx">NodeInformer</span>
+   <span class="nx">podGroupInformerV1beta1</span> <span class="nx">vcinformerv1</span><span class="p">.</span><span class="nx">PodGroupInformer</span>
+   <span class="nx">queueInformerV1beta1</span>    <span class="nx">vcinformerv1</span><span class="p">.</span><span class="nx">QueueInformer</span>
+   <span class="nx">pvInformer</span>              <span class="nx">infov1</span><span class="p">.</span><span class="nx">PersistentVolumeInformer</span>
+   <span class="nx">pvcInformer</span>             <span class="nx">infov1</span><span class="p">.</span><span class="nx">PersistentVolumeClaimInformer</span>
+   <span class="nx">scInformer</span>              <span class="nx">storagev1</span><span class="p">.</span><span class="nx">StorageClassInformer</span>
+   <span class="nx">pcInformer</span>              <span class="nx">schedv1</span><span class="p">.</span><span class="nx">PriorityClassInformer</span>
+   <span class="nx">quotaInformer</span>           <span class="nx">infov1</span><span class="p">.</span><span class="nx">ResourceQuotaInformer</span>
+   <span class="nx">csiNodeInformer</span>         <span class="nx">storagev1</span><span class="p">.</span><span class="nx">CSINodeInformer</span>
+
+   <span class="nx">Binder</span>        <span class="nx">Binder</span>
+   <span class="nx">Evictor</span>       <span class="nx">Evictor</span>
+   <span class="nx">StatusUpdater</span> <span class="nx">StatusUpdater</span>
+   <span class="nx">VolumeBinder</span>  <span class="nx">VolumeBinder</span>
+
+   <span class="nx">Recorder</span> <span class="nx">record</span><span class="p">.</span><span class="nx">EventRecorder</span>
+
+   <span class="nx">Jobs</span>                 <span class="kd">map</span><span class="p">[</span><span class="nx">schedulingapi</span><span class="p">.</span><span class="nx">JobID</span><span class="p">]</span><span class="o">*</span><span class="nx">schedulingapi</span><span class="p">.</span><span class="nx">JobInfo</span>
+   <span class="nx">Nodes</span>                <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="o">*</span><span class="nx">schedulingapi</span><span class="p">.</span><span class="nx">NodeInfo</span>
+   <span class="nx">Queues</span>               <span class="kd">map</span><span class="p">[</span><span class="nx">schedulingapi</span><span class="p">.</span><span class="nx">QueueID</span><span class="p">]</span><span class="o">*</span><span class="nx">schedulingapi</span><span class="p">.</span><span class="nx">QueueInfo</span>
+   <span class="nx">PriorityClasses</span>      <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="o">*</span><span class="nx">v1beta1</span><span class="p">.</span><span class="nx">PriorityClass</span>
+   <span class="nx">defaultPriorityClass</span> <span class="o">*</span><span class="nx">v1beta1</span><span class="p">.</span><span class="nx">PriorityClass</span>
+   <span class="nx">defaultPriority</span>      <span class="kt">int32</span>
+
+   <span class="nx">NamespaceCollection</span> <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="o">*</span><span class="nx">schedulingapi</span><span class="p">.</span><span class="nx">NamespaceCollection</span>
+
+   <span class="nx">errTasks</span>    <span class="nx">workqueue</span><span class="p">.</span><span class="nx">RateLimitingInterface</span>
+   <span class="nx">deletedJobs</span> <span class="nx">workqueue</span><span class="p">.</span><span class="nx">RateLimitingInterface</span>
+<span class="p">}</span>
+</code></pre></div><p>从上面 SchedulerCache 的定义可以想象 scheduler 是通过 schedulerCache 跟集群交流的，然后一些调度必要的信息会被同步在 Jobs, Nodes, Queues, PriorityClasses 等几个 map 中，这里要注意的是这里的 jobInfo 和 taskInfo 跟上面创建的 volcanoJob  没有对应关系了，只是在 cache 中对上面 添加进来的 pod，podgroup 需要一层更上层的缓存结构。</p>
+<h4 id="cacheinfo">cacheInfo</h4>
+<p>　　下面是 jobInfo, taskInfo, nodeInfo, queueInfo 的结构 pkg/scheduler/api/job_info.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">JobInfo</span> <span class="kd">struct</span> <span class="p">{</span>
+   <span class="nx">UID</span> <span class="nx">JobID</span>
+
+   <span class="nx">Name</span>      <span class="kt">string</span>
+   <span class="nx">Namespace</span> <span class="kt">string</span>
+
+   <span class="nx">Queue</span> <span class="nx">QueueID</span>
+
+   <span class="nx">Priority</span> <span class="kt">int32</span>
+
+   <span class="nx">MinAvailable</span> <span class="kt">int32</span>
+
+   <span class="nx">JobFitErrors</span>   <span class="kt">string</span>
+   <span class="nx">NodesFitErrors</span> <span class="kd">map</span><span class="p">[</span><span class="nx">TaskID</span><span class="p">]</span><span class="o">*</span><span class="nx">FitErrors</span>
+
+   <span class="c1">// All tasks of the Job.
+</span><span class="c1"></span>   <span class="nx">TaskStatusIndex</span> <span class="kd">map</span><span class="p">[</span><span class="nx">TaskStatus</span><span class="p">]</span><span class="nx">tasksMap</span>
+   <span class="nx">Tasks</span>           <span class="nx">tasksMap</span>
+
+   <span class="nx">Allocated</span>    <span class="o">*</span><span class="nx">Resource</span>
+   <span class="nx">TotalRequest</span> <span class="o">*</span><span class="nx">Resource</span>
+
+   <span class="nx">CreationTimestamp</span> <span class="nx">metav1</span><span class="p">.</span><span class="nx">Time</span>
+   <span class="nx">PodGroup</span>          <span class="o">*</span><span class="nx">PodGroup</span>
+
+   <span class="nx">ScheduleStartTimestamp</span> <span class="nx">metav1</span><span class="p">.</span><span class="nx">Time</span>
+<span class="p">}</span>
+
+<span class="kd">type</span> <span class="nx">tasksMap</span> <span class="kd">map</span><span class="p">[</span><span class="nx">TaskID</span><span class="p">]</span><span class="o">*</span><span class="nx">TaskInfo</span>
+
+<span class="kd">type</span> <span class="nx">TaskInfo</span> <span class="kd">struct</span> <span class="p">{</span>
+	<span class="nx">UID</span> <span class="nx">TaskID</span>
+	<span class="nx">Job</span> <span class="nx">JobID</span>
+
+	<span class="nx">Name</span>      <span class="kt">string</span>
+	<span class="nx">Namespace</span> <span class="kt">string</span>
+
+	<span class="c1">// Resreq is the resource that used when task running.
+</span><span class="c1"></span>	<span class="nx">Resreq</span> <span class="o">*</span><span class="nx">Resource</span>
+	<span class="c1">// InitResreq is the resource that used to launch a task.
+</span><span class="c1"></span>	<span class="nx">InitResreq</span> <span class="o">*</span><span class="nx">Resource</span>
+
+	<span class="nx">NodeName</span>    <span class="kt">string</span>
+	<span class="nx">Status</span>      <span class="nx">TaskStatus</span>
+	<span class="nx">Priority</span>    <span class="kt">int32</span>
+	<span class="nx">VolumeReady</span> <span class="kt">bool</span>
+
+	<span class="nx">Pod</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Pod</span>
+<span class="p">}</span>
+</code></pre></div><p>可以看到 JobInfo 主要有一个  map[TaskID]*TaskInfo 的 taskmap 记录工作负载信息，同时记录了 podgroup 和 queue 的信息方便相互查询。TaskInfo 是一个pod 信息的封装，主要添加了 JobID，保证可以通过 task 找到所属的 jobInfo。下面 NodeInfo 会通过 tasks 记录在 node 上运行的工作负载，同时记录不同资源的使用情况。queueInfo 则是记录队列资源（queue）的状态。</p>
+<p>pkg/scheduler/api/node_info.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">NodeInfo</span> <span class="kd">struct</span> <span class="p">{</span>
+   <span class="nx">Name</span> <span class="kt">string</span>
+   <span class="nx">Node</span> <span class="o">*</span><span class="nx">v1</span><span class="p">.</span><span class="nx">Node</span>
+
+   <span class="c1">// The state of node
+</span><span class="c1"></span>   <span class="nx">State</span> <span class="nx">NodeState</span>
+
+   <span class="c1">// The releasing resource on that node
+</span><span class="c1"></span>   <span class="nx">Releasing</span> <span class="o">*</span><span class="nx">Resource</span>
+   <span class="c1">// The pipelined resource on that node
+</span><span class="c1"></span>   <span class="nx">Pipelined</span> <span class="o">*</span><span class="nx">Resource</span>
+   <span class="c1">// The idle resource on that node
+</span><span class="c1"></span>   <span class="nx">Idle</span> <span class="o">*</span><span class="nx">Resource</span>
+   <span class="c1">// The used resource on that node, including running and terminating
+</span><span class="c1"></span>   <span class="c1">// pods
+</span><span class="c1"></span>   <span class="nx">Used</span> <span class="o">*</span><span class="nx">Resource</span>
+
+   <span class="nx">Allocatable</span> <span class="o">*</span><span class="nx">Resource</span>
+   <span class="nx">Capability</span>  <span class="o">*</span><span class="nx">Resource</span>
+
+   <span class="nx">Tasks</span> <span class="kd">map</span><span class="p">[</span><span class="nx">TaskID</span><span class="p">]</span><span class="o">*</span><span class="nx">TaskInfo</span>
+
+   <span class="c1">// Used to store custom information
+</span><span class="c1"></span>   <span class="nx">Others</span>     <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="kd">interface</span><span class="p">{}</span>
+   <span class="nx">GPUDevices</span> <span class="kd">map</span><span class="p">[</span><span class="kt">int</span><span class="p">]</span><span class="o">*</span><span class="nx">GPUDevice</span>
+<span class="p">}</span>
+</code></pre></div><p>pkg/scheduler/api/queue_info.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">QueueInfo</span> <span class="kd">struct</span> <span class="p">{</span>
+   <span class="nx">UID</span>  <span class="nx">QueueID</span>
+   <span class="nx">Name</span> <span class="kt">string</span>
+
+   <span class="nx">Weight</span> <span class="kt">int32</span>
+
+   <span class="nx">Weights</span> <span class="kt">string</span>
+
+   <span class="nx">Hierarchy</span> <span class="kt">string</span>
+
+   <span class="nx">Queue</span> <span class="o">*</span><span class="nx">scheduling</span><span class="p">.</span><span class="nx">Queue</span>
+<span class="p">}</span>
+</code></pre></div><p><strong>总结</strong> ：这个步骤是把集群的变动同步到 schedulerCache 不同的字典 (map) 中，方便后续调度时候使用。</p>
+<h3 id="调度">调度</h3>
+<p>　　调度器的主逻辑也是通过 cmd/scheduler/app/server.go 中调用 scheduler.Run 函数实现的，scheduler.Run 会通过 scheduler.cache.run 启动 schedulerCache 的 informer，然后定时调用runOnce 函数（调度流程主逻辑），下面是对应的代码段。</p>
+<p>pkg/scheduler/scheduler.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">pc</span> <span class="o">*</span><span class="nx">Scheduler</span><span class="p">)</span> <span class="nf">Run</span><span class="p">(</span><span class="nx">stopCh</span> <span class="o">&lt;-</span><span class="kd">chan</span> <span class="kd">struct</span><span class="p">{})</span> <span class="p">{</span>
+   <span class="nx">pc</span><span class="p">.</span><span class="nf">loadSchedulerConf</span><span class="p">()</span>
+   <span class="k">go</span> <span class="nx">pc</span><span class="p">.</span><span class="nf">watchSchedulerConf</span><span class="p">(</span><span class="nx">stopCh</span><span class="p">)</span>
+   <span class="c1">// Start cache for policy.
+</span><span class="c1"></span>   <span class="k">go</span> <span class="nx">pc</span><span class="p">.</span><span class="nx">cache</span><span class="p">.</span><span class="nf">Run</span><span class="p">(</span><span class="nx">stopCh</span><span class="p">)</span>
+   <span class="nx">pc</span><span class="p">.</span><span class="nx">cache</span><span class="p">.</span><span class="nf">WaitForCacheSync</span><span class="p">(</span><span class="nx">stopCh</span><span class="p">)</span>
+   <span class="k">go</span> <span class="nx">wait</span><span class="p">.</span><span class="nf">Until</span><span class="p">(</span><span class="nx">pc</span><span class="p">.</span><span class="nx">runOnce</span><span class="p">,</span> <span class="nx">pc</span><span class="p">.</span><span class="nx">schedulePeriod</span><span class="p">,</span> <span class="nx">stopCh</span><span class="p">)</span>
+<span class="p">}</span>
+
+<span class="kd">func</span> <span class="p">(</span><span class="nx">pc</span> <span class="o">*</span><span class="nx">Scheduler</span><span class="p">)</span> <span class="nf">runOnce</span><span class="p">()</span> <span class="p">{</span>
+	<span class="nx">klog</span><span class="p">.</span><span class="nf">V</span><span class="p">(</span><span class="mi">4</span><span class="p">).</span><span class="nf">Infof</span><span class="p">(</span><span class="s">&#34;Start scheduling ...&#34;</span><span class="p">)</span>
+	<span class="nx">scheduleStartTime</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Now</span><span class="p">()</span>
+	<span class="k">defer</span> <span class="nx">klog</span><span class="p">.</span><span class="nf">V</span><span class="p">(</span><span class="mi">4</span><span class="p">).</span><span class="nf">Infof</span><span class="p">(</span><span class="s">&#34;End scheduling ...&#34;</span><span class="p">)</span>
+
+	<span class="nx">pc</span><span class="p">.</span><span class="nx">mutex</span><span class="p">.</span><span class="nf">Lock</span><span class="p">()</span>
+	<span class="nx">actions</span> <span class="o">:=</span> <span class="nx">pc</span><span class="p">.</span><span class="nx">actions</span>
+	<span class="nx">plugins</span> <span class="o">:=</span> <span class="nx">pc</span><span class="p">.</span><span class="nx">plugins</span>
+	<span class="nx">configurations</span> <span class="o">:=</span> <span class="nx">pc</span><span class="p">.</span><span class="nx">configurations</span>
+	<span class="nx">pc</span><span class="p">.</span><span class="nx">mutex</span><span class="p">.</span><span class="nf">Unlock</span><span class="p">()</span>
+
+	<span class="nx">ssn</span> <span class="o">:=</span> <span class="nx">framework</span><span class="p">.</span><span class="nf">OpenSession</span><span class="p">(</span><span class="nx">pc</span><span class="p">.</span><span class="nx">cache</span><span class="p">,</span> <span class="nx">plugins</span><span class="p">,</span> <span class="nx">configurations</span><span class="p">)</span>
+	<span class="k">defer</span> <span class="nx">framework</span><span class="p">.</span><span class="nf">CloseSession</span><span class="p">(</span><span class="nx">ssn</span><span class="p">)</span>
+
+	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">action</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">actions</span> <span class="p">{</span>
+		<span class="nx">actionStartTime</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Now</span><span class="p">()</span>
+		<span class="nx">action</span><span class="p">.</span><span class="nf">Execute</span><span class="p">(</span><span class="nx">ssn</span><span class="p">)</span>
+		<span class="nx">metrics</span><span class="p">.</span><span class="nf">UpdateActionDuration</span><span class="p">(</span><span class="nx">action</span><span class="p">.</span><span class="nf">Name</span><span class="p">(),</span> <span class="nx">metrics</span><span class="p">.</span><span class="nf">Duration</span><span class="p">(</span><span class="nx">actionStartTime</span><span class="p">))</span>
+	<span class="p">}</span>
+	<span class="nx">metrics</span><span class="p">.</span><span class="nf">UpdateE2eDuration</span><span class="p">(</span><span class="nx">metrics</span><span class="p">.</span><span class="nf">Duration</span><span class="p">(</span><span class="nx">scheduleStartTime</span><span class="p">))</span>
+<span class="p">}</span>
+</code></pre></div><p>每次调用 runOnce 的过程如下面调度流程图所示：</p>
+<p><img
+        class="lazyload"
+        src="/svg/loading.min.svg"
+        data-src="scheduler.png"
+        data-srcset="/posts/volcano_public/scheduler.png, scheduler.png 1.5x, /posts/volcano_public/scheduler.png 2x"
+        data-sizes="auto"
+        alt="/posts/volcano_public/scheduler.png"
+        title="scheduler" /></p>
+<ul>
+<li><strong>OpenSession</strong>： 获得这次调度过程的上下文，主要是对 cache 的信息（JobInfos，NodeInfos）做一次 snapshot，然后注册不同 actions 的 plugins。</li>
+<li><strong>enqueue</strong>：这个 action 目的是更新一次集群的可提供的资源和待调度 job 的状态，如果 job 里面所有的 task 所需要的资源比集群空余资源小，就会把 job.PodGroup.Status.Phase 从 <strong>PodGroupPending</strong> 置为 <strong>PodGroupInqueue</strong>。从这里可以看出 volcano 是以 job 为单位进行调度准入的。</li>
+<li><strong>allocate</strong>：这个 action 是调度的的主逻辑，对应 kube-scheduler 的调度和绑定这两步。不过，这里以 task 为单位进行，也是通过预选（PredicateNodes），优选（PrioritizeNodes）的步骤筛选合适的 node，然后对 task 和 node 进行绑定。</li>
+<li><strong>preempt</strong>：抢占 actions 是可选的，不过跟 kube-scheduler 的抢占不同的是，不会抢占已经调度完成的 tasks，只会尝试从其他调度队列中的 jobs 或者是同一调度队列的 jobs 中抢占资源（根据 jobs 的优先级抢占）。如果希望抢占已经调度的资源，可以开启另外一个 action <strong>reclaim</strong> ，会尝试抢占其他低优先级队列中的已经调度 jobs 的资源。</li>
+<li><strong>backfill</strong>：这个 actions 我认为是 volcano 比较特别的一个功能，主要是对前面提到还在 pending 中的 jobs 预留资源，因为在集群资源紧张的时候，有可能还没等到有足够的资源启动 job 所有的 tasks，资源就被分配掉了。backfill 会尝试看到资源就申请占用着，等到 jobs 启动的条件足够再退出来让给 job。</li>
+</ul>
+<p>下面会针上面 runOnce 提到的每个模块的功能进行分析。</p>
+<h4 id="opensession">OpenSession</h4>
+<p>　　用来启动 Session 作为调度的上下文，并且通过 tiers 的配置信息创建不同的 plugins，然后再通过 OnSessionOpen 函数，注册不同的辅助函数位点，如 jobOrderFns，queueOrderFns 等。其中 openSession 函数用于生成一个 session 实例，然后对 schedulerCache 进行一次 snapshot（把 cache 中的 jobs，queues 等信息使用snapshot 缓存起来），然后传给 session。</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="c1">// pkg/scheduler/framework/framework.go
+</span><span class="c1"></span><span class="kd">func</span> <span class="nf">OpenSession</span><span class="p">(</span><span class="nx">cache</span> <span class="nx">cache</span><span class="p">.</span><span class="nx">Cache</span><span class="p">,</span> <span class="nx">tiers</span> <span class="p">[]</span><span class="nx">conf</span><span class="p">.</span><span class="nx">Tier</span><span class="p">,</span> <span class="nx">configurations</span> <span class="p">[]</span><span class="nx">conf</span><span class="p">.</span><span class="nx">Configuration</span><span class="p">)</span> <span class="o">*</span><span class="nx">Session</span> <span class="p">{</span>
+   <span class="nx">ssn</span> <span class="o">:=</span> <span class="nf">openSession</span><span class="p">(</span><span class="nx">cache</span><span class="p">)</span>
+   <span class="nx">ssn</span><span class="p">.</span><span class="nx">Tiers</span> <span class="p">=</span> <span class="nx">tiers</span>
+   <span class="nx">ssn</span><span class="p">.</span><span class="nx">Configurations</span> <span class="p">=</span> <span class="nx">configurations</span>
+
+   <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">tier</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">tiers</span> <span class="p">{</span>
+      <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">plugin</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">tier</span><span class="p">.</span><span class="nx">Plugins</span> <span class="p">{</span>
+         <span class="k">if</span> <span class="nx">pb</span><span class="p">,</span> <span class="nx">found</span> <span class="o">:=</span> <span class="nf">GetPluginBuilder</span><span class="p">(</span><span class="nx">plugin</span><span class="p">.</span><span class="nx">Name</span><span class="p">);</span> <span class="p">!</span><span class="nx">found</span> <span class="p">{</span>
+            <span class="nx">klog</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="s">&#34;Failed to get plugin %s.&#34;</span><span class="p">,</span> <span class="nx">plugin</span><span class="p">.</span><span class="nx">Name</span><span class="p">)</span>
+         <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="nx">plugin</span> <span class="o">:=</span> <span class="nf">pb</span><span class="p">(</span><span class="nx">plugin</span><span class="p">.</span><span class="nx">Arguments</span><span class="p">)</span>
+            <span class="nx">ssn</span><span class="p">.</span><span class="nx">plugins</span><span class="p">[</span><span class="nx">plugin</span><span class="p">.</span><span class="nf">Name</span><span class="p">()]</span> <span class="p">=</span> <span class="nx">plugin</span>
+         <span class="p">}</span>
+      <span class="p">}</span>
+   <span class="p">}</span>
+
+   <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">plugin</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">ssn</span><span class="p">.</span><span class="nx">plugins</span> <span class="p">{</span>
+      <span class="nx">onSessionOpenStart</span> <span class="o">:=</span> <span class="nx">time</span><span class="p">.</span><span class="nf">Now</span><span class="p">()</span>
+      <span class="nx">plugin</span><span class="p">.</span><span class="nf">OnSessionOpen</span><span class="p">(</span><span class="nx">ssn</span><span class="p">)</span>
+      <span class="nx">metrics</span><span class="p">.</span><span class="nf">UpdatePluginDuration</span><span class="p">(</span><span class="nx">plugin</span><span class="p">.</span><span class="nf">Name</span><span class="p">(),</span> <span class="nx">metrics</span><span class="p">.</span><span class="nx">OnSessionOpen</span><span class="p">,</span> <span class="nx">metrics</span><span class="p">.</span><span class="nf">Duration</span><span class="p">(</span><span class="nx">onSessionOpenStart</span><span class="p">))</span>
+   <span class="p">}</span>
+
+   <span class="k">return</span> <span class="nx">ssn</span>
+<span class="p">}</span>
+
+<span class="c1">// pkg/scheduler/framework/session.go
+</span><span class="c1"></span><span class="kd">func</span> <span class="nf">openSession</span><span class="p">(</span><span class="nx">cache</span> <span class="nx">cache</span><span class="p">.</span><span class="nx">Cache</span><span class="p">)</span> <span class="o">*</span><span class="nx">Session</span> <span class="p">{</span>
+	<span class="nx">ssn</span> <span class="o">:=</span> <span class="o">&amp;</span><span class="nx">Session</span><span class="p">{</span>
+		<span class="nx">UID</span><span class="p">:</span>        <span class="nx">uuid</span><span class="p">.</span><span class="nf">NewUUID</span><span class="p">(),</span>
+		<span class="nx">kubeClient</span><span class="p">:</span> <span class="nx">cache</span><span class="p">.</span><span class="nf">Client</span><span class="p">(),</span>
+		<span class="nx">cache</span><span class="p">:</span>      <span class="nx">cache</span><span class="p">,</span>
+		<span class="nx">podGroupStatus</span><span class="p">:</span> <span class="kd">map</span><span class="p">[</span><span class="nx">api</span><span class="p">.</span><span class="nx">JobID</span><span class="p">]</span><span class="nx">scheduling</span><span class="p">.</span><span class="nx">PodGroupStatus</span><span class="p">{},</span>
+		<span class="nx">Jobs</span><span class="p">:</span>   <span class="kd">map</span><span class="p">[</span><span class="nx">api</span><span class="p">.</span><span class="nx">JobID</span><span class="p">]</span><span class="o">*</span><span class="nx">api</span><span class="p">.</span><span class="nx">JobInfo</span><span class="p">{},</span>
+		<span class="nx">Nodes</span><span class="p">:</span>  <span class="kd">map</span><span class="p">[</span><span class="kt">string</span><span class="p">]</span><span class="o">*</span><span class="nx">api</span><span class="p">.</span><span class="nx">NodeInfo</span><span class="p">{},</span>
+		<span class="nx">Queues</span><span class="p">:</span> <span class="kd">map</span><span class="p">[</span><span class="nx">api</span><span class="p">.</span><span class="nx">QueueID</span><span class="p">]</span><span class="o">*</span><span class="nx">api</span><span class="p">.</span><span class="nx">QueueInfo</span><span class="p">{},</span>
+	  <span class="o">...</span> <span class="c1">// 操作函数位点
+</span><span class="c1"></span>	<span class="p">}</span>
+
+	<span class="nx">snapshot</span> <span class="o">:=</span> <span class="nx">cache</span><span class="p">.</span><span class="nf">Snapshot</span><span class="p">()</span>
+
+	<span class="nx">ssn</span><span class="p">.</span><span class="nx">Jobs</span> <span class="p">=</span> <span class="nx">snapshot</span><span class="p">.</span><span class="nx">Jobs</span>
+	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">job</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">ssn</span><span class="p">.</span><span class="nx">Jobs</span> <span class="p">{</span>
+		<span class="c1">// only conditions will be updated periodically
+</span><span class="c1"></span>		<span class="k">if</span> <span class="nx">job</span><span class="p">.</span><span class="nx">PodGroup</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="o">&amp;&amp;</span> <span class="nx">job</span><span class="p">.</span><span class="nx">PodGroup</span><span class="p">.</span><span class="nx">Status</span><span class="p">.</span><span class="nx">Conditions</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+			<span class="nx">ssn</span><span class="p">.</span><span class="nx">podGroupStatus</span><span class="p">[</span><span class="nx">job</span><span class="p">.</span><span class="nx">UID</span><span class="p">]</span> <span class="p">=</span> <span class="nx">job</span><span class="p">.</span><span class="nx">PodGroup</span><span class="p">.</span><span class="nx">Status</span>
+		<span class="p">}</span>
+
+		<span class="k">if</span> <span class="nx">vjr</span> <span class="o">:=</span> <span class="nx">ssn</span><span class="p">.</span><span class="nf">JobValid</span><span class="p">(</span><span class="nx">job</span><span class="p">);</span> <span class="nx">vjr</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+			<span class="k">if</span> <span class="p">!</span><span class="nx">vjr</span><span class="p">.</span><span class="nx">Pass</span> <span class="p">{</span>
+        <span class="o">...</span> <span class="c1">// 如果这个 job 无效
+</span><span class="c1"></span>			<span class="p">}</span>
+			<span class="nb">delete</span><span class="p">(</span><span class="nx">ssn</span><span class="p">.</span><span class="nx">Jobs</span><span class="p">,</span> <span class="nx">job</span><span class="p">.</span><span class="nx">UID</span><span class="p">)</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+
+	<span class="nx">ssn</span><span class="p">.</span><span class="nx">Nodes</span> <span class="p">=</span> <span class="nx">snapshot</span><span class="p">.</span><span class="nx">Nodes</span>
+	<span class="nx">ssn</span><span class="p">.</span><span class="nx">Queues</span> <span class="p">=</span> <span class="nx">snapshot</span><span class="p">.</span><span class="nx">Queues</span>
+	<span class="nx">ssn</span><span class="p">.</span><span class="nx">NamespaceInfo</span> <span class="p">=</span> <span class="nx">snapshot</span><span class="p">.</span><span class="nx">NamespaceInfo</span>
+  
+	<span class="k">return</span> <span class="nx">ssn</span>
+<span class="p">}</span>
+</code></pre></div><h4 id="enqueue">Enqueue</h4>
+<p>　　我自己的感觉是有一些冗余的，具体的工作感觉像是做一次过滤和状态的更新（在 cache 中），具体代码如下：</p>
+<ul>
+<li>首先把 session 中的 jobs  一个个拿出来看，如果是在 pending 就放到 jobMap 中</li>
+<li>然后根据 session 的 nodes 对资源进行统计，如果 job 的最小资源需求（MinResources）比空余资源少，对 job 的状态置为 PodGroupInqueue。然后重新放 session 中。</li>
+</ul>
+<p>这一步在 kube-batch 最新的版本里面是没有的，是 OpenSession 之后就直接 allocate 了，volcano             中有这一步，也在 allocate 中有下面的判断：</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="k">if</span> <span class="nx">job</span><span class="p">.</span><span class="nx">PodGroup</span><span class="p">.</span><span class="nx">Status</span><span class="p">.</span><span class="nx">Phase</span> <span class="o">==</span> <span class="nx">scheduling</span><span class="p">.</span><span class="nx">PodGroupPending</span> <span class="p">{</span>
+   <span class="k">continue</span>
+<span class="p">}</span>
+</code></pre></div><p>这样看来，enqueue 相当于前置了原来在预选阶段的资源限制条件，同时不同的 task 的资源需求汇总在同一个 job 中。</p>
+<p>pkg/scheduler/actions/enqueue/enqueue.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">enqueue</span> <span class="o">*</span><span class="nx">Action</span><span class="p">)</span> <span class="nf">Execute</span><span class="p">(</span><span class="nx">ssn</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">Session</span><span class="p">)</span> <span class="p">{</span>
+   <span class="nx">queues</span> <span class="o">:=</span> <span class="nx">util</span><span class="p">.</span><span class="nf">NewPriorityQueue</span><span class="p">(</span><span class="nx">ssn</span><span class="p">.</span><span class="nx">QueueOrderFn</span><span class="p">)</span>
+   <span class="nx">queueMap</span> <span class="o">:=</span> <span class="kd">map</span><span class="p">[</span><span class="nx">api</span><span class="p">.</span><span class="nx">QueueID</span><span class="p">]</span><span class="o">*</span><span class="nx">api</span><span class="p">.</span><span class="nx">QueueInfo</span><span class="p">{}</span>
+   <span class="nx">jobsMap</span> <span class="o">:=</span> <span class="kd">map</span><span class="p">[</span><span class="nx">api</span><span class="p">.</span><span class="nx">QueueID</span><span class="p">]</span><span class="o">*</span><span class="nx">util</span><span class="p">.</span><span class="nx">PriorityQueue</span><span class="p">{}</span>
+
+   <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">job</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">ssn</span><span class="p">.</span><span class="nx">Jobs</span> <span class="p">{</span>
+      <span class="o">...</span> 
+      <span class="k">if</span> <span class="nx">job</span><span class="p">.</span><span class="nx">PodGroup</span><span class="p">.</span><span class="nx">Status</span><span class="p">.</span><span class="nx">Phase</span> <span class="o">==</span> <span class="nx">scheduling</span><span class="p">.</span><span class="nx">PodGroupPending</span> <span class="p">{</span>
+         <span class="k">if</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">found</span> <span class="o">:=</span> <span class="nx">jobsMap</span><span class="p">[</span><span class="nx">job</span><span class="p">.</span><span class="nx">Queue</span><span class="p">];</span> <span class="p">!</span><span class="nx">found</span> <span class="p">{</span>
+            <span class="nx">jobsMap</span><span class="p">[</span><span class="nx">job</span><span class="p">.</span><span class="nx">Queue</span><span class="p">]</span> <span class="p">=</span> <span class="nx">util</span><span class="p">.</span><span class="nf">NewPriorityQueue</span><span class="p">(</span><span class="nx">ssn</span><span class="p">.</span><span class="nx">JobOrderFn</span><span class="p">)</span>
+         <span class="p">}</span>
+         <span class="nx">jobsMap</span><span class="p">[</span><span class="nx">job</span><span class="p">.</span><span class="nx">Queue</span><span class="p">].</span><span class="nf">Push</span><span class="p">(</span><span class="nx">job</span><span class="p">)</span>
+      <span class="p">}</span>
+   <span class="p">}</span>
+   <span class="nx">total</span> <span class="o">:=</span> <span class="nx">api</span><span class="p">.</span><span class="nf">EmptyResource</span><span class="p">()</span>
+   <span class="nx">used</span> <span class="o">:=</span> <span class="nx">api</span><span class="p">.</span><span class="nf">EmptyResource</span><span class="p">()</span>
+   <span class="o">...</span> 
+   <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">node</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">ssn</span><span class="p">.</span><span class="nx">Nodes</span> <span class="p">{</span>
+      <span class="nx">total</span><span class="p">.</span><span class="nf">Add</span><span class="p">(</span><span class="nx">node</span><span class="p">.</span><span class="nx">Allocatable</span><span class="p">)</span>
+      <span class="nx">used</span><span class="p">.</span><span class="nf">Add</span><span class="p">(</span><span class="nx">node</span><span class="p">.</span><span class="nx">Used</span><span class="p">)</span>
+   <span class="p">}</span>
+   <span class="nx">idle</span> <span class="o">:=</span> <span class="nx">total</span><span class="p">.</span><span class="nf">Clone</span><span class="p">().</span><span class="nf">Multi</span><span class="p">(</span><span class="nx">enqueue</span><span class="p">.</span><span class="nf">getOverCommitFactor</span><span class="p">(</span><span class="nx">ssn</span><span class="p">)).</span><span class="nf">Sub</span><span class="p">(</span><span class="nx">used</span><span class="p">).</span><span class="nf">Sub</span><span class="p">(</span><span class="nx">lockedNodesIdle</span><span class="p">)</span>
+
+   <span class="k">for</span> <span class="p">{</span>
+      <span class="o">...</span> <span class="c1">// jobs pop from queue
+</span><span class="c1"></span>      <span class="nx">job</span> <span class="o">:=</span> <span class="nx">jobs</span><span class="p">.</span><span class="nf">Pop</span><span class="p">().(</span><span class="o">*</span><span class="nx">api</span><span class="p">.</span><span class="nx">JobInfo</span><span class="p">)</span>
+      <span class="o">...</span> <span class="c1">// targetJob
+</span><span class="c1"></span>      <span class="nx">inqueue</span> <span class="o">:=</span> <span class="kc">false</span>
+
+      <span class="k">if</span> <span class="nx">job</span><span class="p">.</span><span class="nx">PodGroup</span><span class="p">.</span><span class="nx">Spec</span><span class="p">.</span><span class="nx">MinResources</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+         <span class="nx">inqueue</span> <span class="p">=</span> <span class="kc">true</span>
+      <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+         <span class="nx">minReq</span> <span class="o">:=</span> <span class="nx">api</span><span class="p">.</span><span class="nf">NewResource</span><span class="p">(</span><span class="o">*</span><span class="nx">job</span><span class="p">.</span><span class="nx">PodGroup</span><span class="p">.</span><span class="nx">Spec</span><span class="p">.</span><span class="nx">MinResources</span><span class="p">)</span>
+         <span class="k">if</span> <span class="nx">ssn</span><span class="p">.</span><span class="nf">JobEnqueueable</span><span class="p">(</span><span class="nx">job</span><span class="p">)</span> <span class="o">&amp;&amp;</span> <span class="nx">minReq</span><span class="p">.</span><span class="nf">LessEqual</span><span class="p">(</span><span class="nx">idle</span><span class="p">)</span> <span class="p">{</span>
+            <span class="nx">idle</span><span class="p">.</span><span class="nf">Sub</span><span class="p">(</span><span class="nx">minReq</span><span class="p">)</span>
+            <span class="nx">inqueue</span> <span class="p">=</span> <span class="kc">true</span>
+         <span class="p">}</span>
+      <span class="p">}</span>
+
+      <span class="k">if</span> <span class="nx">inqueue</span> <span class="p">{</span>
+         <span class="nx">job</span><span class="p">.</span><span class="nx">PodGroup</span><span class="p">.</span><span class="nx">Status</span><span class="p">.</span><span class="nx">Phase</span> <span class="p">=</span> <span class="nx">scheduling</span><span class="p">.</span><span class="nx">PodGroupInqueue</span>
+         <span class="nx">ssn</span><span class="p">.</span><span class="nx">Jobs</span><span class="p">[</span><span class="nx">job</span><span class="p">.</span><span class="nx">UID</span><span class="p">]</span> <span class="p">=</span> <span class="nx">job</span>
+      <span class="p">}</span>
+
+      <span class="c1">// Added Queue back until no job in Queue.
+</span><span class="c1"></span>      <span class="nx">queues</span><span class="p">.</span><span class="nf">Push</span><span class="p">(</span><span class="nx">queue</span><span class="p">)</span>
+   <span class="p">}</span>
+   <span class="o">...</span> <span class="c1">// targetJob enqueue
+</span><span class="c1"></span><span class="p">}</span>
+</code></pre></div><h4 id="allocate">Allocate</h4>
+<p>　　allocate 这部分是 volcano(kube-batch) 调度的主逻辑，包括比较多的步骤：</p>
+<ul>
+<li>
+<p>把 Session.Jobs 按照 namespace，queue 的 key 送到 jobsMap 中。</p>
+</li>
+<li>
+<p>选择一个命名空间 namespace N。</p>
+</li>
+<li>
+<p>从 N 选择一个队列 queue Q。</p>
+</li>
+<li>
+<p>从 Q 中选择一个 job J。</p>
+</li>
+<li>
+<p>从 J 选择一个 task T 进行预选（PredicateNodes）， 优选（PrioritizeNodes）然后使用 BestNodeFn 选出最适合的 node。</p>
+</li>
+<li>
+<p>重复上面的步骤直到所有的 namespace 下所有的 queue 的 jobs 的 tasks 都调度完成了。</p>
+</li>
+</ul>
+<p>因为 allocate 的 Execute 逻辑比较多，我会把这部分拆为两个部分讲述。</p>
+<p>Part1: 数据准备</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">alloc</span> <span class="o">*</span><span class="nx">Action</span><span class="p">)</span> <span class="nf">Execute</span><span class="p">(</span><span class="nx">ssn</span> <span class="o">*</span><span class="nx">framework</span><span class="p">.</span><span class="nx">Session</span><span class="p">)</span> <span class="p">{</span>
+  
+   <span class="nx">namespaces</span> <span class="o">:=</span> <span class="nx">util</span><span class="p">.</span><span class="nf">NewPriorityQueue</span><span class="p">(</span><span class="nx">ssn</span><span class="p">.</span><span class="nx">NamespaceOrderFn</span><span class="p">)</span>
+
+   <span class="nx">jobsMap</span> <span class="o">:=</span> <span class="kd">map</span><span class="p">[</span><span class="nx">api</span><span class="p">.</span><span class="nx">NamespaceName</span><span class="p">]</span><span class="kd">map</span><span class="p">[</span><span class="nx">api</span><span class="p">.</span><span class="nx">QueueID</span><span class="p">]</span><span class="o">*</span><span class="nx">util</span><span class="p">.</span><span class="nx">PriorityQueue</span><span class="p">{}</span>
+
+   <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">job</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">ssn</span><span class="p">.</span><span class="nx">Jobs</span> <span class="p">{</span>
+   	   <span class="o">...</span> <span class="c1">// 把 ssn.Jobs 的 job 按照对应 namespace, queue 的标签放到 jobsMap 中。
+</span><span class="c1"></span>   <span class="p">}</span>
+
+   <span class="nx">allNodes</span> <span class="o">:=</span> <span class="nx">util</span><span class="p">.</span><span class="nf">GetNodeList</span><span class="p">(</span><span class="nx">ssn</span><span class="p">.</span><span class="nx">Nodes</span><span class="p">)</span>
+	 <span class="o">...</span> <span class="c1">// targetjobs 
+</span><span class="c1"></span>   <span class="nx">predicateFn</span> <span class="o">:=</span> <span class="kd">func</span><span class="p">(</span><span class="nx">task</span> <span class="o">*</span><span class="nx">api</span><span class="p">.</span><span class="nx">TaskInfo</span><span class="p">,</span> <span class="nx">node</span> <span class="o">*</span><span class="nx">api</span><span class="p">.</span><span class="nx">NodeInfo</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+      <span class="c1">// Check for Resource Predicate
+</span><span class="c1"></span>      <span class="k">if</span> <span class="p">!</span><span class="nx">task</span><span class="p">.</span><span class="nx">InitResreq</span><span class="p">.</span><span class="nf">LessEqual</span><span class="p">(</span><span class="nx">node</span><span class="p">.</span><span class="nf">FutureIdle</span><span class="p">())</span> <span class="p">{</span>
+         <span class="k">return</span> <span class="nx">api</span><span class="p">.</span><span class="nf">NewFitError</span><span class="p">(</span><span class="nx">task</span><span class="p">,</span> <span class="nx">node</span><span class="p">,</span> <span class="nx">api</span><span class="p">.</span><span class="nx">NodeResourceFitFailed</span><span class="p">)</span>
+      <span class="p">}</span>
+
+      <span class="k">return</span> <span class="nx">ssn</span><span class="p">.</span><span class="nf">PredicateFn</span><span class="p">(</span><span class="nx">task</span><span class="p">,</span> <span class="nx">node</span><span class="p">)</span>
+   <span class="p">}</span>
+   <span class="c1">// part2 
+</span><span class="c1"></span><span class="p">}</span>
+</code></pre></div><p>Part2 对所有 jobs 下的 tasks 进行调度绑定</p>
+<ol>
+<li>先把每个 namespace 下的 queue 按 queueOrder 顺序拿出这个 queue 的 jobs。</li>
+<li>然后对这个 job 的 tasks 过滤掉 BestEffort 的 task。</li>
+<li>对每个 task 进行 PredicateNodes 获得预选之后的 nodes。</li>
+<li>对预选得到的 predicateNodes 进行优选（PrioritizeNodes）得到 candidateNodes</li>
+<li>通过 BestNodeFn 选出最终的 node。</li>
+<li>如果目前 node 资源就足够使用 statement.Allocate 先预留这部分资源</li>
+<li>如果是在将来资源才足够，就使用 statement.Pipeline 在 cache 记录上。</li>
+<li>最后通过 statement.Commit() 进行绑定。</li>
+<li>namespace 重新入队，直到 namespace 没有元素。</li>
+</ol>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="k">for</span> <span class="p">{</span>
+   <span class="k">if</span> <span class="nx">namespaces</span><span class="p">.</span><span class="nf">Empty</span><span class="p">()</span> <span class="p">{</span>
+      <span class="k">break</span>
+   <span class="p">}</span>
+
+   <span class="c1">// pick namespace from namespaces PriorityQueue
+</span><span class="c1"></span>   <span class="nx">namespace</span> <span class="o">:=</span> <span class="nx">namespaces</span><span class="p">.</span><span class="nf">Pop</span><span class="p">().(</span><span class="nx">api</span><span class="p">.</span><span class="nx">NamespaceName</span><span class="p">)</span>
+
+   <span class="nx">queueInNamespace</span> <span class="o">:=</span> <span class="nx">jobsMap</span><span class="p">[</span><span class="nx">namespace</span><span class="p">]</span>
+
+   <span class="kd">var</span> <span class="nx">queue</span> <span class="o">*</span><span class="nx">api</span><span class="p">.</span><span class="nx">QueueInfo</span>
+   <span class="k">for</span> <span class="nx">queueID</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">queueInNamespace</span> <span class="p">{</span>
+       <span class="o">...</span> <span class="c1">// 1. queue 按顺序拿出来
+</span><span class="c1"></span>   <span class="p">}</span>
+
+   <span class="k">if</span> <span class="nx">queue</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span><span class="o">...</span><span class="p">}</span>
+
+   <span class="nx">jobs</span><span class="p">,</span> <span class="nx">found</span> <span class="o">:=</span> <span class="nx">queueInNamespace</span><span class="p">[</span><span class="nx">queue</span><span class="p">.</span><span class="nx">UID</span><span class="p">]</span>
+   <span class="k">if</span> <span class="p">!</span><span class="nx">found</span> <span class="o">||</span> <span class="nx">jobs</span><span class="p">.</span><span class="nf">Empty</span><span class="p">()</span> <span class="p">{</span><span class="o">...</span><span class="p">}</span>
+
+   <span class="nx">job</span> <span class="o">:=</span> <span class="nx">jobs</span><span class="p">.</span><span class="nf">Pop</span><span class="p">().(</span><span class="o">*</span><span class="nx">api</span><span class="p">.</span><span class="nx">JobInfo</span><span class="p">)</span>
+   <span class="k">if</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">found</span> <span class="p">=</span> <span class="nx">pendingTasks</span><span class="p">[</span><span class="nx">job</span><span class="p">.</span><span class="nx">UID</span><span class="p">];</span> <span class="p">!</span><span class="nx">found</span> <span class="p">{</span>
+      <span class="nx">tasks</span> <span class="o">:=</span> <span class="nx">util</span><span class="p">.</span><span class="nf">NewPriorityQueue</span><span class="p">(</span><span class="nx">ssn</span><span class="p">.</span><span class="nx">TaskOrderFn</span><span class="p">)</span>
+      <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">task</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">job</span><span class="p">.</span><span class="nx">TaskStatusIndex</span><span class="p">[</span><span class="nx">api</span><span class="p">.</span><span class="nx">Pending</span><span class="p">]</span> <span class="p">{</span>
+         <span class="o">...</span> <span class="c1">// 2. 过滤 BestEffort task
+</span><span class="c1"></span>         <span class="nx">tasks</span><span class="p">.</span><span class="nf">Push</span><span class="p">(</span><span class="nx">task</span><span class="p">)</span>
+      <span class="p">}</span>
+      <span class="nx">pendingTasks</span><span class="p">[</span><span class="nx">job</span><span class="p">.</span><span class="nx">UID</span><span class="p">]</span> <span class="p">=</span> <span class="nx">tasks</span>
+   <span class="p">}</span>
+   <span class="nx">tasks</span> <span class="o">:=</span> <span class="nx">pendingTasks</span><span class="p">[</span><span class="nx">job</span><span class="p">.</span><span class="nx">UID</span><span class="p">]</span>
+
+   <span class="nx">stmt</span> <span class="o">:=</span> <span class="nx">framework</span><span class="p">.</span><span class="nf">NewStatement</span><span class="p">(</span><span class="nx">ssn</span><span class="p">)</span>
+
+   <span class="k">for</span> <span class="p">!</span><span class="nx">tasks</span><span class="p">.</span><span class="nf">Empty</span><span class="p">()</span> <span class="p">{</span>
+      <span class="nx">task</span> <span class="o">:=</span> <span class="nx">tasks</span><span class="p">.</span><span class="nf">Pop</span><span class="p">().(</span><span class="o">*</span><span class="nx">api</span><span class="p">.</span><span class="nx">TaskInfo</span><span class="p">)</span>
+      <span class="c1">// 3. 预选过程
+</span><span class="c1"></span>      <span class="nx">predicateNodes</span><span class="p">,</span> <span class="nx">fitErrors</span> <span class="o">:=</span> <span class="nx">util</span><span class="p">.</span><span class="nf">PredicateNodes</span><span class="p">(</span><span class="nx">task</span><span class="p">,</span> <span class="nx">nodes</span><span class="p">,</span> <span class="nx">predicateFn</span><span class="p">)</span>
+      <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">predicateNodes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+         <span class="nx">job</span><span class="p">.</span><span class="nx">NodesFitErrors</span><span class="p">[</span><span class="nx">task</span><span class="p">.</span><span class="nx">UID</span><span class="p">]</span> <span class="p">=</span> <span class="nx">fitErrors</span>
+         <span class="k">break</span>
+      <span class="p">}</span>
+			<span class="o">...</span>
+      <span class="c1">// If not candidate nodes for this task, skip it.
+</span><span class="c1"></span>      <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="nx">candidateNodes</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span> <span class="p">{</span>
+         <span class="k">continue</span>
+      <span class="p">}</span>
+			<span class="c1">// 4. 优选过程
+</span><span class="c1"></span>      <span class="nx">nodeScores</span> <span class="o">:=</span> <span class="nx">util</span><span class="p">.</span><span class="nf">PrioritizeNodes</span><span class="p">(</span><span class="nx">task</span><span class="p">,</span> <span class="nx">candidateNodes</span><span class="p">,</span> <span class="nx">ssn</span><span class="p">.</span><span class="nx">BatchNodeOrderFn</span><span class="p">,</span> <span class="nx">ssn</span><span class="p">.</span><span class="nx">NodeOrderMapFn</span><span class="p">,</span> <span class="nx">ssn</span><span class="p">.</span><span class="nx">NodeOrderReduceFn</span><span class="p">)</span>
+      <span class="c1">// 5. 选出最佳节点
+</span><span class="c1"></span>      <span class="nx">node</span> <span class="o">:=</span> <span class="nx">ssn</span><span class="p">.</span><span class="nf">BestNodeFn</span><span class="p">(</span><span class="nx">task</span><span class="p">,</span> <span class="nx">nodeScores</span><span class="p">)</span>
+      <span class="k">if</span> <span class="nx">node</span> <span class="o">==</span> <span class="kc">nil</span> <span class="p">{</span>
+         <span class="nx">node</span> <span class="p">=</span> <span class="nx">util</span><span class="p">.</span><span class="nf">SelectBestNode</span><span class="p">(</span><span class="nx">nodeScores</span><span class="p">)</span>
+      <span class="p">}</span>
+
+      <span class="c1">// Allocate idle resource to the task.
+</span><span class="c1"></span>      <span class="k">if</span> <span class="nx">task</span><span class="p">.</span><span class="nx">InitResreq</span><span class="p">.</span><span class="nf">LessEqual</span><span class="p">(</span><span class="nx">node</span><span class="p">.</span><span class="nx">Idle</span><span class="p">)</span> <span class="p">{</span>
+        <span class="c1">// 6. 如果 node 资源够就把资源在 cache 中先占着
+</span><span class="c1"></span>         <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">stmt</span><span class="p">.</span><span class="nf">Allocate</span><span class="p">(</span><span class="nx">task</span><span class="p">,</span> <span class="nx">node</span><span class="p">.</span><span class="nx">Name</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span><span class="o">...</span><span class="p">}</span>
+      <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+        <span class="c1">// 7. 如果现在不满足 idle 将来满足也行，先 pipeline 起来（有可能有 pod 在 terminating）
+</span><span class="c1"></span>        <span class="k">if</span> <span class="nx">task</span><span class="p">.</span><span class="nx">InitResreq</span><span class="p">.</span><span class="nf">LessEqual</span><span class="p">(</span><span class="nx">node</span><span class="p">.</span><span class="nf">FutureIdle</span><span class="p">())</span> <span class="p">{</span>
+            <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">ssn</span><span class="p">.</span><span class="nf">Pipeline</span><span class="p">(</span><span class="nx">task</span><span class="p">,</span> <span class="nx">node</span><span class="p">.</span><span class="nx">Name</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span><span class="o">...</span><span class="p">}</span>
+        <span class="p">}</span>
+      <span class="p">}</span>
+
+      <span class="o">...</span>
+   <span class="p">}</span> <span class="c1">// tasks.Empty()
+</span><span class="c1"></span>
+   <span class="k">if</span> <span class="nx">ssn</span><span class="p">.</span><span class="nf">JobReady</span><span class="p">(</span><span class="nx">job</span><span class="p">)</span> <span class="p">{</span>
+      <span class="nx">metrics</span><span class="p">.</span><span class="nf">UpdateE2eSchedulingDurationByJob</span><span class="p">(</span><span class="nx">job</span><span class="p">.</span><span class="nx">Name</span><span class="p">,</span> <span class="nx">metrics</span><span class="p">.</span><span class="nf">Duration</span><span class="p">(</span><span class="nx">job</span><span class="p">.</span><span class="nx">CreationTimestamp</span><span class="p">.</span><span class="nx">Time</span><span class="p">))</span>
+      <span class="c1">// 8. 对节点进行绑定
+</span><span class="c1"></span>      <span class="nx">stmt</span><span class="p">.</span><span class="nf">Commit</span><span class="p">()</span>
+   <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+      <span class="nx">stmt</span><span class="p">.</span><span class="nf">Discard</span><span class="p">()</span>
+   <span class="p">}</span>
+
+   <span class="c1">// 重新入队 namespace
+</span><span class="c1"></span>   <span class="nx">namespaces</span><span class="p">.</span><span class="nf">Push</span><span class="p">(</span><span class="nx">namespace</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div><p>上面 stmt.Commit 会调用 statement  的 allocate 函数，然后通过 cache 调用 bind 进行绑定。</p>
+<p>pkg/scheduler/framework/statement.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">Statement</span><span class="p">)</span> <span class="nf">Commit</span><span class="p">()</span> <span class="p">{</span>
+	<span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">op</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">s</span><span class="p">.</span><span class="nx">operations</span> <span class="p">{</span>
+		<span class="k">switch</span> <span class="nx">op</span><span class="p">.</span><span class="nx">name</span> <span class="p">{</span>
+		<span class="k">case</span> <span class="nx">Evict</span><span class="p">:</span>
+      <span class="o">...</span>
+		<span class="k">case</span> <span class="nx">Pipeline</span><span class="p">:</span>
+			<span class="nx">s</span><span class="p">.</span><span class="nf">pipeline</span><span class="p">(</span><span class="nx">op</span><span class="p">.</span><span class="nx">task</span><span class="p">)</span>
+		<span class="k">case</span> <span class="nx">Allocate</span><span class="p">:</span>
+			<span class="nx">err</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nf">allocate</span><span class="p">(</span><span class="nx">op</span><span class="p">.</span><span class="nx">task</span><span class="p">)</span>
+      <span class="o">...</span>
+		<span class="p">}</span>
+	<span class="p">}</span>
+<span class="p">}</span>
+<span class="kd">func</span> <span class="p">(</span><span class="nx">s</span> <span class="o">*</span><span class="nx">Statement</span><span class="p">)</span> <span class="nf">allocate</span><span class="p">(</span><span class="nx">task</span> <span class="o">*</span><span class="nx">api</span><span class="p">.</span><span class="nx">TaskInfo</span><span class="p">)</span> <span class="kt">error</span> <span class="p">{</span>
+   <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nx">ssn</span><span class="p">.</span><span class="nx">cache</span><span class="p">.</span><span class="nf">BindVolumes</span><span class="p">(</span><span class="nx">task</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="nx">err</span>
+   <span class="p">}</span>
+
+   <span class="k">if</span> <span class="nx">err</span> <span class="o">:=</span> <span class="nx">s</span><span class="p">.</span><span class="nx">ssn</span><span class="p">.</span><span class="nx">cache</span><span class="p">.</span><span class="nf">Bind</span><span class="p">(</span><span class="nx">task</span><span class="p">,</span> <span class="nx">task</span><span class="p">.</span><span class="nx">NodeName</span><span class="p">);</span> <span class="nx">err</span> <span class="o">!=</span> <span class="kc">nil</span> <span class="p">{</span>
+      <span class="k">return</span> <span class="nx">err</span>
+   <span class="p">}</span>
+
+   <span class="o">...</span> <span class="c1">// Update status in session
+</span><span class="c1"></span>   <span class="k">return</span> <span class="kc">nil</span>
+<span class="p">}</span>
+</code></pre></div><p><strong>总结</strong>：allocate 是volcano 调度的主流程，完成之后在所有 namespace 下的所有队列 queues 里的每个状态是 PodGroupInQueue 的 jobs 都被调度完成，或者所有 namespace 下的 queue 的元素都遍历了才会退出。后面 preempt 和 backfill 的步骤跟 allocate 有一些类似，也是会查看 session.Jobs 的元素，然后尝试去抢占或者预留，因为不是必要的步骤，这里就不继续讨论了，有兴趣的同学可以去看相关的代码。</p>
+<h4 id="调度回顾">调度回顾</h4>
+<p>现在我们回顾一下上一个阶段<strong>同步信息</strong>之后，我们在 cache 的 jobs，nodes，queues 已经有我们创建 pod 更新的信息了，这时需要等待下一个调度循环 runOnce 开始。进入下一个调度循环之后，会依次经过 OpenSession -&gt; Enqueue -&gt; Allocate 如果成功完成调度，这是比较简单的一个循环，也在上面进行了介绍。如果是有抢占和预留的，流程会是  OpenSession -&gt; Enqueue -&gt; Allocate -&gt; Preempt -&gt; Backfill，这个循环预留或者抢占的可能需要到下个，或者下下个循环的调度上才会用到。</p>
+<h3 id="plugin机制">Plugin机制</h3>
+<p>　　在上面的调度流程图的右边可以看到 volcano 可以通过支持新的 action 或者 plugin 来支持不同的调度形式，前者一般是新的流程，是一个独立的步骤，可以在runOnce 调用的时候需要跟其他 action 不冲突，如支持抢占和预留就是通过新的 action 进行的；后者主要是提供不同的调度策略，我们这里以组合调度 gang plugin 进行举例说明。</p>
+<p>plugin 接口如下：</p>
+<p>pkg/scheduler/framework/interface.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="c1">// Plugin is the interface of scheduler plugin
+</span><span class="c1"></span><span class="kd">type</span> <span class="nx">Plugin</span> <span class="kd">interface</span> <span class="p">{</span>
+   <span class="c1">// The unique name of Plugin.
+</span><span class="c1"></span>   <span class="nf">Name</span><span class="p">()</span> <span class="kt">string</span>
+
+   <span class="nf">OnSessionOpen</span><span class="p">(</span><span class="nx">ssn</span> <span class="o">*</span><span class="nx">Session</span><span class="p">)</span>
+   <span class="nf">OnSessionClose</span><span class="p">(</span><span class="nx">ssn</span> <span class="o">*</span><span class="nx">Session</span><span class="p">)</span>
+<span class="p">}</span>
+</code></pre></div><p>在scheduler 中需要用 pkg/scheduler/framework/plugins.go 中的 RegisterPluginBuilder 进行登记，如：</p>
+<p>pkg/scheduler/plugins/factory.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">init</span><span class="p">()</span> <span class="p">{</span>
+   <span class="c1">// Plugins for Jobs
+</span><span class="c1"></span>   <span class="nx">framework</span><span class="p">.</span><span class="nf">RegisterPluginBuilder</span><span class="p">(</span><span class="s">&#34;drf&#34;</span><span class="p">,</span> <span class="nx">drf</span><span class="p">.</span><span class="nx">New</span><span class="p">)</span>
+   <span class="nx">framework</span><span class="p">.</span><span class="nf">RegisterPluginBuilder</span><span class="p">(</span><span class="s">&#34;gang&#34;</span><span class="p">,</span> <span class="nx">gang</span><span class="p">.</span><span class="nx">New</span><span class="p">)</span>
+	 <span class="o">...</span>
+<span class="p">}</span>
+</code></pre></div><p>然后在前面 OpenSession 的过程中加入到 Session.Plugins 中，下面会调用每个 plugins 的 OnSessionOpen 的函数。</p>
+<p>pkg/scheduler/framework/framework.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">func</span> <span class="nf">OpenSession</span><span class="p">(</span><span class="nx">cache</span> <span class="nx">cache</span><span class="p">.</span><span class="nx">Cache</span><span class="p">,</span> <span class="nx">tiers</span> <span class="p">[]</span><span class="nx">conf</span><span class="p">.</span><span class="nx">Tier</span><span class="p">)</span> <span class="o">*</span><span class="nx">Session</span> <span class="p">{</span>
+	 <span class="o">...</span>
+   <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">tier</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">tiers</span> <span class="p">{</span>
+      <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">plugin</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">tier</span><span class="p">.</span><span class="nx">Plugins</span> <span class="p">{</span>
+         <span class="k">if</span> <span class="nx">pb</span><span class="p">,</span> <span class="nx">found</span> <span class="o">:=</span> <span class="nf">GetPluginBuilder</span><span class="p">(</span><span class="nx">plugin</span><span class="p">.</span><span class="nx">Name</span><span class="p">);</span> <span class="p">!</span><span class="nx">found</span> <span class="p">{</span>
+            <span class="nx">klog</span><span class="p">.</span><span class="nf">Errorf</span><span class="p">(</span><span class="s">&#34;Failed to get plugin %s.&#34;</span><span class="p">,</span> <span class="nx">plugin</span><span class="p">.</span><span class="nx">Name</span><span class="p">)</span>
+         <span class="p">}</span> <span class="k">else</span> <span class="p">{</span>
+            <span class="nx">plugin</span> <span class="o">:=</span> <span class="nf">pb</span><span class="p">(</span><span class="nx">plugin</span><span class="p">.</span><span class="nx">Arguments</span><span class="p">)</span>
+            <span class="nx">ssn</span><span class="p">.</span><span class="nx">plugins</span><span class="p">[</span><span class="nx">plugin</span><span class="p">.</span><span class="nf">Name</span><span class="p">()]</span> <span class="p">=</span> <span class="nx">plugin</span>
+         <span class="p">}</span>
+      <span class="p">}</span>
+   <span class="p">}</span>
+   <span class="k">for</span> <span class="nx">_</span><span class="p">,</span> <span class="nx">plugin</span> <span class="o">:=</span> <span class="k">range</span> <span class="nx">ssn</span><span class="p">.</span><span class="nx">plugins</span> <span class="p">{</span>
+      <span class="nx">plugin</span><span class="p">.</span><span class="nf">OnSessionOpen</span><span class="p">(</span><span class="nx">ssn</span><span class="p">)</span>
+   <span class="o">...</span>
+<span class="p">}</span>
+</code></pre></div><p>gang plugin 相关的函数在 pkg/scheduler/plugins/gang/gang.go 中，其 OnSessionOpen 主要干了几件事：</p>
+<ul>
+<li>注册 JobValidFn，如果 job 的 task 用例小于 MinAvailable 返回 Pass = False，这个函数在openSession 的过程中调用</li>
+<li>注册抢占判断函数 PreemptableFn 和回收判断函数 ReclaimableFn，都是查看这个 job，去掉一个 task 实例之后是不是还满足 MinAvailable，如果满足就是可以抢占这个实例。这两个函数是在抢占流程和回收流程的时候会被调用。</li>
+<li>注册 JobOrderFn ，主要是增加一个判断条件：这两个 job 是不是 ready，主要是通过 occupied &gt;= ji.MinAvailable 的条件进行。这个会在入队和 allocate 的流程中被调用。</li>
+</ul>
+<p>整体上，gang plugins 的逻辑就是围绕着 jobInfos.MinAvailable 这个属性展开的，几个函数位点主要也是为了增加跟 jobInfos.MinAvailable 的比较条件。</p>
+<p><strong>总结</strong>：volcano(kube-batch) 的 plugins 机制一定程度上增加了调度器的可扩展性，不过很多的函数位点没有很清楚的说明作用和调用的地方需要自己去找。然后如果后续引入了新的 actions 需要有新的位点，可能需要修改 Session 的结构体等位置，对代码有侵入性。</p>
+<h2 id="总结">总结</h2>
+<p>　　volcano（kube-batch）在很大程度上补足了 kubernetes 批调度的短板，在其提供的性能测试的效果来看，基本上可以应对比较大规模集群的调度需求（千级以上）。另外，比起 kube-batch，volcano 提供了一个可扩展的 job 资源以及一系列的命令行工具方便用户从大数据和高性能计算等使用场景的迁移。整体上，volcano 应该基本能满足大多数场景下批调度的需求。</p>
+<h2 id="参考">参考</h2>
+<p><a href="https://github.com/volcano-sh/volcano" target="_blank" rel="noopener noreffer">Volcano</a></p>
+<p><a href="https://github.com/kubernetes-sigs/kube-batch" target="_blank" rel="noopener noreffer">kube-batch</a></p>
+<p><a href="https://bbs.huaweicloud.com/blogs/239642" target="_blank" rel="noopener noreffer">Volcano架构解读</a></p>
+<p><a href="https://bbs.huaweicloud.com/forum/thread-66929-1-1.html" target="_blank" rel="noopener noreffer">Volcano 社区资料</a></p>
+</div><div class="post-footer" id="post-footer">
+    <div class="post-info">
+        <div class="post-info-line">
+            <div class="post-info-mod">
+                <span>更新于 2021-02-06</span>
+            </div>
+            <div class="post-info-license"></div>
+        </div>
+        <div class="post-info-line">
+            <div class="post-info-md"></div>
+            <div class="post-info-share">
+                <span></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-info-more">
+        <section class="post-tags"></section>
+        <section>
+            <span><a href="javascript:void(0);" onclick="window.history.back();">返回</a></span>&nbsp;|&nbsp;<span><a href="/">主页</a></span>
+        </section>
+    </div>
+
+    <div class="post-nav"><a href="/posts/scheduler_framework/" class="prev" rel="prev" title="Scheduler Framework 源码分析"><i class="fas fa-angle-left fa-fw"></i>Scheduler Framework 源码分析</a></div>
+</div>
+</article></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line">由 <a href="https://gohugo.io/" target="_blank" rel="noopener noreffer" title="Hugo 0.74.1">Hugo</a> 强力驱动 | 主题 - <a href="https://github.com/dillonzq/LoveIt" target="_blank" rel="noopener noreffer" title="LoveIt 0.2.10"><i class="far fa-kiss-wink-heart fa-fw"></i> LoveIt</a>
+                </div><div class="footer-line"><i class="far fa-copyright fa-fw"></i><span itemprop="copyrightYear">2021</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank"></a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="回到顶部">
+                <i class="fas fa-arrow-up fa-fw"></i>
+            </a><a href="#" id="view-comments" class="fixed-button" title="查看评论">
+                <i class="fas fa-comment fa-fw"></i>
+            </a>
+        </div><script type="text/javascript" src="/lib/smooth-scroll/smooth-scroll.min.js"></script><script type="text/javascript" src="/lib/lazysizes/lazysizes.min.js"></script><script type="text/javascript" src="/lib/clipboard/clipboard.min.js"></script><script type="text/javascript">window.config={"code":{"copyTitle":"复制到剪贴板","maxShownLines":10},"comment":{}};</script><script type="text/javascript" src="/js/theme.min.js"></script></body>
+</html>
