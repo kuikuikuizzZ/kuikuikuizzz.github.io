@@ -1,0 +1,22 @@
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+    <channel>
+        <title>工作 - 标签 - kuikuikuizzZ blog</title>
+        <link>https://kuikuikuizzz.github.io/tags/%E5%B7%A5%E4%BD%9C/</link>
+        <description>工作 - 标签 - kuikuikuizzZ blog</description>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><managingEditor>kimmmywu@gmail.com (kuikuikuizzZ)</managingEditor>
+            <webMaster>kimmmywu@gmail.com (kuikuikuizzZ)</webMaster><lastBuildDate>Sun, 09 Aug 2020 21:36:54 &#43;0800</lastBuildDate><atom:link href="https://kuikuikuizzz.github.io/tags/%E5%B7%A5%E4%BD%9C/" rel="self" type="application/rss+xml" /><item>
+    <title>工作两年</title>
+    <link>https://kuikuikuizzz.github.io/posts/lifenote/2yearsengineer/</link>
+    <pubDate>Sun, 09 Aug 2020 21:36:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/posts/lifenote/2yearsengineer/</guid>
+    <description><![CDATA[工作两年 不知不觉已经工作两年了，一天天下来感觉充实而苦闷，充实是每天其实都能感觉自己在变强，很多的知识会扑面而来，如果不学就会自然落后了。苦]]></description>
+</item><item>
+    <title>回忆两年前</title>
+    <link>https://kuikuikuizzz.github.io/posts/lifenote/lookup2years/</link>
+    <pubDate>Sat, 01 Aug 2020 23:36:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/posts/lifenote/lookup2years/</guid>
+    <description><![CDATA[回忆两年前 大家好，我是吴文辉。是才云科技的一名工程师，算是一个半路出家的码农。现在工作的方向可能比较杂，计算机视觉，分布式机器学习，k8s 等]]></description>
+</item></channel>
+</rss>

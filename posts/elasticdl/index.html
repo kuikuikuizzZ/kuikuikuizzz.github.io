@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+        <title>ElasticDL 弹性分布式研读 - kuikuikuizzZ blog</title><meta name="Description" content=""><meta property="og:title" content="ElasticDL 弹性分布式研读" />
+<meta property="og:description" content="项目介绍 ElasticDL 是蚂蚁金服开源的一个基于 TensorFlow 2.0 eager execution 和 Kubernetes 的弹性分布式深度学习框架。ElasticDL 没有像 Kubeflow 和 pytorch/elastic 那样选择开发 Kubernetes Operator，整个 elasticDL" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://kuikuikuizzz.github.io/posts/elasticdl/" />
+<meta property="article:published_time" content="2020-09-07T22:22:54+08:00" />
+<meta property="article:modified_time" content="2020-09-07T22:22:54+08:00" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="ElasticDL 弹性分布式研读"/>
+<meta name="twitter:description" content="项目介绍 ElasticDL 是蚂蚁金服开源的一个基于 TensorFlow 2.0 eager execution 和 Kubernetes 的弹性分布式深度学习框架。ElasticDL 没有像 Kubeflow 和 pytorch/elastic 那样选择开发 Kubernetes Operator，整个 elasticDL"/>
+<meta name="application-name" content="kuikuikuizzZ blog">
+<meta name="apple-mobile-web-app-title" content="kuikuikuizzZ blog"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="https://kuikuikuizzz.github.io/posts/elasticdl/" /><link rel="prev" href="https://kuikuikuizzz.github.io/posts/pytorch_elastic/" /><link rel="next" href="https://kuikuikuizzz.github.io/posts/horovod_public/" /><link rel="stylesheet" href="/lib/normalize/normalize.min.css"><link rel="stylesheet" href="/css/style.min.css"><link rel="stylesheet" href="/lib/fontawesome-free/all.min.css"><link rel="stylesheet" href="/lib/animate/animate.min.css"><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "ElasticDL 弹性分布式研读",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "https:\/\/kuikuikuizzz.github.io\/posts\/elasticdl\/"
+        },"genre": "posts","keywords": "elastic, kubernetes, tensorflow, machine learning","wordcount":  2104 ,
+        "url": "https:\/\/kuikuikuizzz.github.io\/posts\/elasticdl\/","datePublished": "2020-09-07T22:22:54+08:00","dateModified": "2020-09-07T22:22:54+08:00","publisher": {
+            "@type": "Organization",
+            "name": "kuikuikuizzZ"},"author": {
+                "@type": "Person",
+                "name": "kuikuikuizzZ"
+            },"description": ""
+    }
+    </script></head>
+    <body header-desktop="" header-mobile=""><script type="text/javascript">(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : '' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="kuikuikuizzZ blog">kuikuikuizzZ blog</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/categories/"> 分类 </a><a class="menu-item" href="/about/"> 关于 </a><span class="menu-item delimiter"></span><span class="menu-item search" id="search-desktop">
+                        <input type="text" placeholder="搜索文章标题或内容..." id="search-input-desktop">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-desktop" title="搜索">
+                            <i class="fas fa-search fa-fw"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-desktop" title="清空">
+                            <i class="fas fa-times-circle fa-fw"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-desktop">
+                            <i class="fas fa-spinner fa-fw fa-spin"></i>
+                        </span>
+                    </span><a href="javascript:void(0);" class="menu-item theme-switch" title="切换主题">
+                    <i class="fas fa-adjust fa-fw"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="kuikuikuizzZ blog">kuikuikuizzZ blog</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><div class="search-wrapper">
+                    <div class="search mobile" id="search-mobile">
+                        <input type="text" placeholder="搜索文章标题或内容..." id="search-input-mobile">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-mobile" title="搜索">
+                            <i class="fas fa-search fa-fw"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-mobile" title="清空">
+                            <i class="fas fa-times-circle fa-fw"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-mobile">
+                            <i class="fas fa-spinner fa-fw fa-spin"></i>
+                        </span>
+                    </div>
+                    <a href="javascript:void(0);" class="search-cancel" id="search-cancel-mobile">
+                        取消
+                    </a>
+                </div><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/categories/" title="">分类</a><a class="menu-item" href="/about/" title="">关于</a><a href="javascript:void(0);" class="menu-item theme-switch" title="切换主题">
+                <i class="fas fa-adjust fa-fw"></i>
+            </a></div>
+    </div>
+</header>
+<div class="search-dropdown desktop">
+    <div id="search-dropdown-desktop"></div>
+</div>
+<div class="search-dropdown mobile">
+    <div id="search-dropdown-mobile"></div>
+</div>
+<main class="main">
+                <div class="container"><div class="toc" id="toc-auto">
+            <h2 class="toc-title">目录</h2>
+            <div class="toc-content" id="toc-content-auto"></div>
+        </div><article class="page single"><h1 class="single-title animated flipInX">ElasticDL 弹性分布式研读</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel=" author" class="author"><i class="fas fa-user-circle fa-fw"></i>kuikuikuizzZ</a></span>&nbsp;<span class="post-category">收录于 <a href="/categories/%E6%8A%80%E6%9C%AF/"><i class="far fa-folder fa-fw"></i>技术</a></span></div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw"></i>&nbsp;<time datetime="2020-09-07">2020-09-07</time>&nbsp;<i class="fas fa-pencil-alt fa-fw"></i>&nbsp;约 2104 字&nbsp;
+                <i class="far fa-clock fa-fw"></i>&nbsp;预计阅读 5 分钟&nbsp;</div>
+        </div><div class="details toc" id="toc-static"  kept="">
+                <div class="details-summary toc-title">
+                    <span>目录</span>
+                    <span><i class="details-icon fas fa-angle-right"></i></span>
+                </div>
+                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents">
+  <ul>
+    <li><a href="#项目介绍">项目介绍</a>
+      <ul>
+        <li><a href="#对--tensorflow-2x-的支持">对  Tensorflow 2.x 的支持</a></li>
+      </ul>
+    </li>
+    <li><a href="#系统架构">系统架构</a>
+      <ul>
+        <li><a href="#准备模型和相关函数">准备模型和相关函数</a></li>
+        <li><a href="#运行-elastic-客户端">运行 elastic 客户端</a></li>
+        <li><a href="#数据分发">数据分发</a></li>
+        <li><a href="#弹性机制实现">弹性机制实现</a></li>
+        <li><a href="#删除-worker">删除 Worker</a></li>
+        <li><a href="#增加-worker">增加 Worker</a></li>
+      </ul>
+    </li>
+    <li><a href="#总结">总结</a></li>
+    <li><a href="#参考">参考</a></li>
+  </ul>
+</nav></div>
+            </div><div class="content" id="content"><h2 id="项目介绍">项目介绍</h2>
+<p>　　ElasticDL 是蚂蚁金服开源的一个基于 TensorFlow 2.0 eager execution 和 Kubernetes 的弹性分布式深度学习框架。ElasticDL 没有像 Kubeflow 和 pytorch/elastic 那样选择开发 <strong>Kubernetes Operator</strong>，整个 elasticDL 跟 Kubernetes 的沟通主要依赖 k8s 的 client 进行对简单的对象（pod，job）进行管理。ElasticDL 通过在 Kubernetes 上创建 master 进程来控制深度学习训练作业的弹性调度。注意下面内容针对的是 Elastic 0.2.0 rc2的版本进行探讨的。</p>
+<h3 id="对--tensorflow-2x-的支持">对  Tensorflow 2.x 的支持</h3>
+<p>　　我们知道 TensorFlow 2.x eager mode 采用和 TensorFlow 1.x 解释执行图完全不同的深度学习计算方式。前向计算过程把对基本计算单元（operator）的调用记录在一个内存数据结构 tape 里， 随后反向计算过程（计算 gradients）可以回溯这个 tape，以此调用 operator 对应的 gradient operator。 ElasticDL 会通过 tape 获取 gradient 后，可以使用 Parameter Server 或者 AllReduce 分布式策略来更新模型参数。</p>
+<h2 id="系统架构">系统架构</h2>
+<p>​　　ElasticDL 的 master 会根据数据索引将数据分片，为每个数据分片创建一个 task。然后 master 会调用 Kubernetes API 启动多个 worker 进程。每个 worker 启动后，会向 master 请求 task。worker 收到来自 master 分发的 task 后，会读取 task 对应的数据分片来前向计算和梯度计算。</p>
+<p>​    同时，master 会通过 Kubernetes API 监听集群中每个 worker 的状态。当有 worker 被高优先级作业抢占后，master 会回收该 worker 的未完成 task，然后重新分发给其他的 worker。同时 master 会尝试通过 Kubernetes API重新拉起被抢占的 worker。等到资源充足时，worker 进程会被重新启动，并加入训练作业，整体流程如下图所示。</p>
+<figure>
+    <img src="v2-cf7e4f878bf93f14d76c5014d7f8cda9_b.png"/> 
+</figure>
+
+<h3 id="准备模型和相关函数">准备模型和相关函数</h3>
+<p>　　用户需要在 model_zoo 的文件夹下把 tensorflow 模型和相关的训练测试组件定义好，如：优化器 optimizer，损失函数 loss function，数据集 dataset，验证性能函数 eval_metrics_fn 等，下面是定义一个训练的例子。整体上， 如果是已实现的模型，可能需要按照他们的方式重新定义训练一次。</p>
+<p>model_zoo/cifar10/xxx_functional_api.py</p>
+<pre><code>def custom_model() -&gt; tf.keras.Model
+def loss() -&gt; tf.loss
+def callbacks()
+def optimizer() -&gt; tf.optimizers
+def dataset_fn() -&gt; tf.data.Dataset
+def eval_metrics_fn() -&gt; dict(string:tf.keras.metrics)
+</code></pre><p>然后需要把你这些模型相关的定义文件copy到镜像里面，推上仓库。</p>
+<pre><code>cd ${CODE_PATH}/elasticdl/model_zoo
+elasticdl zoo init
+elasticdl zoo build --image=${DOCKER_HUB_REPO}/elasticdl:mnist .
+elasticdl zoo push ${DOCKER_HUB_REPO}/elasticdl:mnist
+</code></pre><h3 id="运行-elastic-客户端">运行 elastic 客户端</h3>
+<p>这步对应上图（ElasticDL Client）</p>
+<pre><code>elasticdl train \
+ --image_name=elasticdl:mnist \
+ --model_zoo=model_zoo \
+ --model_def=mnist.mnist_functional_api.custom_model \
+ --training_data=/data/mnist/train \
+ --job_name=test-mnist \
+ --volume=&quot;host_path=/data,mount_path=/data&quot;
+</code></pre><p>这一步主要干了以下一些工作：</p>
+<ul>
+<li>通过 k8s client 使用前面打好的镜像启动 master pod ，pod 的运行命令为：</li>
+</ul>
+<p>python -m elasticdl.python.master.main -xxx</p>
+<p>Master.main 主要做了以下工作</p>
+<ul>
+<li>设置这个 job 训练的模型（model）</li>
+<li>启动 task_dispatcher，用于分割数据集，然后告诉不同的 worker 读取dataset 不同的部分，通过传递index实现。</li>
+<li>启动 instance_manager 用于管理worker 和 ps 的生命周期，instance_manager 通过调用 k8s 的客户端启动 parameter server 和 workers 的 pod ，同时记录 ps, worker 的 ID。</li>
+<li>启动 master_service 和 ps_service，前者是用于响应 worker get_task 的request 的，后者用于同步 worker 过来的梯度 gradient 做 all_reduce等动作。（这里的两个server 好像是在一起的，没有另外起pod）</li>
+<li>启动好的 worker 使用 get_task 从 master service 轮询 task id，做完前向运算（下称 forward），后向运算（下称 backward） 之后把梯度更新到 PS server 上，调用流程如下图。</li>
+<li>直到没有 task 或者 所有的 worker 都 failed 才会停止。</li>
+</ul>
+<figure>
+    <img src="v2-1061e57e124aec3c4d7ac94e6b96823a_b.png"/> 
+</figure>
+
+<h3 id="数据分发">数据分发</h3>
+<p>　　数据需要处理成多个 chunk （默认支持的是多个 tfrecords）。master 会把数据看成一个 record list。把不同的 record_index 组合成不同的 task，分给不同的 workers。这里需要不同的 worker 都能看到这份数据。workers 会把读取的数据，塞进 models，获取梯度 gradient，在 parameter server 上更新，数据分发/读取如下图所示。</p>
+<figure>
+    <img src="v2-439bc4793e8f6d16a0e02fa4d858c9e0_b.png"/> 
+</figure>
+
+<h3 id="弹性机制实现">弹性机制实现</h3>
+<p>　　ElasticDL 默认就是需要在 k8s 上使用的，不过整体上没有相关的资源CRD，也没有对应的operator 操作资源。基本上使用的是 k8s 最原生的基础资源 （pod, job, service 等)，elasticDL 的<strong>弹性是通过 k8s 不同资源的优先级</strong>实现的。</p>
+<h3 id="删除-worker">删除 Worker</h3>
+<p>　　如果有其他的 workload 优先级比现在跑的 jobs 高，就会把 workers 的 pod 删掉。因为这些 pod 是没有对应的 owner 的，死掉就死掉了，没有完成的 tasks 因为会超时，会从 <strong>Doing -&gt; TODO</strong> 重新入队。</p>
+<h3 id="增加-worker">增加 Worker</h3>
+<p>　　Master 会利用 InstanceManager 一直 <strong>watch namespace</strong> 下 pods 的状态，如果有空闲，就会 <strong>relaunch workers</strong>。 worker 起来后又会主动向 master get_task。如下面1图到2图是增加了一个 worker 之后，task 的分配。3图是有 worker 退出后的情况。</p>
+<figure>
+    <img src="v2-968a4795e9fa12d9a988a40647c14efa_b.png"/> 
+</figure>
+
+<h2 id="总结">总结</h2>
+<p>　　我个人的感觉是 ElasticDL 是一个比较独立的系统，Tensorflow 的部分和 Kubernetes 的部分耦合在一起了，后续支持新的框架和新的调度方式有难度。在项目里直接拿过来用在 k8s 的系统上使用，很容易会跟k8s 调用逻辑有冲突（如需要自己打镜像再推镜像，然后自己去尝试重启死掉的pod 等的操作，看起来都不是很native）。而且使用上对用户有一定的学习成本，并且不是所有tensorflow 定义的模型都可以比较顺利的跑起来，感觉只支持tensorflow 创建出来模型的一个子集。</p>
+<p>　　不过 ElasticDL 某程度上提供一种在 k8s 上分布式训练的思路吧，ElasticDL 算是把 tensorflow  的数据预处理的部分和梯度更新部分使用自己的方法实现了一次，让其在 k8s 上调度会更加的灵活（相当于调度的粒度是一个batch的数据和梯度）。 tf-operator 和 pytorch-operator 只负责把容器起起来，然后让训练的程序在上面跑，数据的读取和梯度的整合都需要程序描述好（某程度上对外部的调度系统（k8s）是不感知的），所以不同worker 之间的动态联动也是有限的，调度的粒度为 pod。</p>
+<h2 id="参考">参考</h2>
+<ul>
+<li><a href="https://github.com/sql-machine-learning/elasticdl" target="_blank" rel="noopener noreffer">sql-machine-learning/elasticDL</a></li>
+<li><a href="https://mp.weixin.qq.com/s/IQMXg6nIJO-9-IG3mJpvRg" target="_blank" rel="noopener noreffer">ElasticDL：同时提升集群利用率和研发效率的分布式深度学习框架</a></li>
+</ul>
+</div><div class="post-footer" id="post-footer">
+    <div class="post-info">
+        <div class="post-info-line">
+            <div class="post-info-mod">
+                <span>更新于 2020-09-07</span>
+            </div>
+            <div class="post-info-license"></div>
+        </div>
+        <div class="post-info-line">
+            <div class="post-info-md"></div>
+            <div class="post-info-share">
+                <span></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-info-more">
+        <section class="post-tags"><i class="fas fa-tags fa-fw"></i>&nbsp;<a href="/tags/elastic/">elastic</a>,&nbsp;<a href="/tags/kubernetes/">kubernetes</a>,&nbsp;<a href="/tags/tensorflow/">tensorflow</a>,&nbsp;<a href="/tags/machine-learning/">machine learning</a></section>
+        <section>
+            <span><a href="javascript:void(0);" onclick="window.history.back();">返回</a></span>&nbsp;|&nbsp;<span><a href="/">主页</a></span>
+        </section>
+    </div>
+
+    <div class="post-nav"><a href="/posts/pytorch_elastic/" class="prev" rel="prev" title="Pytorch/elstic 弹性分布式研读"><i class="fas fa-angle-left fa-fw"></i>Pytorch/elstic 弹性分布式研读</a>
+            <a href="/posts/horovod_public/" class="next" rel="next" title="Horovod 源码分析">Horovod 源码分析<i class="fas fa-angle-right fa-fw"></i></a></div>
+</div>
+</article></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line"><i class="far fa-copyright fa-fw"></i><span itemprop="copyrightYear">2021</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank">kuikuikuizzZ</a></span>&nbsp;|&nbsp;<span class="license"><a rel="license external nofollow noopener noreffer" href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank">CC BY-NC 4.0</a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="回到顶部">
+                <i class="fas fa-arrow-up fa-fw"></i>
+            </a><a href="#" id="view-comments" class="fixed-button" title="查看评论">
+                <i class="fas fa-comment fa-fw"></i>
+            </a>
+        </div><link rel="stylesheet" href="/lib/lightgallery/lightgallery.min.css"><script type="text/javascript" src="/lib/smooth-scroll/smooth-scroll.min.js"></script><script type="text/javascript" src="/lib/autocomplete/autocomplete.min.js"></script><script type="text/javascript" src="/lib/algoliasearch/algoliasearch-lite.umd.min.js"></script><script type="text/javascript" src="/lib/lazysizes/lazysizes.min.js"></script><script type="text/javascript" src="/lib/lightgallery/lightgallery.min.js"></script><script type="text/javascript" src="/lib/lightgallery/lg-thumbnail.min.js"></script><script type="text/javascript" src="/lib/lightgallery/lg-zoom.min.js"></script><script type="text/javascript" src="/lib/clipboard/clipboard.min.js"></script><script type="text/javascript">window.config={"code":{"copyTitle":"复制到剪贴板","maxShownLines":10},"comment":{},"lightGallery":{"actualSize":false,"exThumbImage":"data-thumbnail","hideBarsDelay":2000,"selector":".lightgallery","speed":400,"thumbContHeight":80,"thumbWidth":80,"thumbnail":true},"search":{"algoliaAppID":"","algoliaIndex":"","algoliaSearchKey":"","highlightTag":"em","maxResultLength":10,"noResultsFound":"没有找到结果","snippetLength":50,"type":"algolia"}};</script><script type="text/javascript" src="/js/theme.min.js"></script></body>
+</html>

@@ -1,0 +1,43 @@
+<rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
+    <channel>
+        <title>kubernetes - 标签 - kuikuikuizzZ blog</title>
+        <link>https://kuikuikuizzz.github.io/tags/kubernetes/</link>
+        <description>kubernetes - 标签 - kuikuikuizzZ blog</description>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><managingEditor>kimmmywu@gmail.com (kuikuikuizzZ)</managingEditor>
+            <webMaster>kimmmywu@gmail.com (kuikuikuizzZ)</webMaster><lastBuildDate>Sat, 06 Feb 2021 11:06:54 &#43;0800</lastBuildDate><atom:link href="https://kuikuikuizzz.github.io/tags/kubernetes/" rel="self" type="application/rss+xml" /><item>
+    <title>Volcano 批调度器源码分析</title>
+    <link>https://kuikuikuizzz.github.io/posts/volcano_public/</link>
+    <pubDate>Sat, 06 Feb 2021 11:06:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/posts/volcano_public/</guid>
+    <description><![CDATA[Volcano（scheduler 03） 介绍 ​ 除了前面聊到的通过 scheduler framework 对 kubernetes 的调度特性进行扩展之外，还可以通过多调度器的方式进行扩展，因为我自己]]></description>
+</item><item>
+    <title>Scheduler Framework 源码分析</title>
+    <link>https://kuikuikuizzz.github.io/posts/scheduler_framework/</link>
+    <pubDate>Fri, 29 Jan 2021 11:06:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/posts/scheduler_framework/</guid>
+    <description><![CDATA[Scheduler framework 前面我们聊了 kubernetes 的默认调度器 default scheduler，其简单的调度逻辑，在 kubernetes 多个版本的迭代中一直保持稳定性能。不过随着 Kubernetes 部署的任务类型越来越多]]></description>
+</item><item>
+    <title>Kubernetes Scheduler 源码分析</title>
+    <link>https://kuikuikuizzz.github.io/posts/scheduler_public/</link>
+    <pubDate>Sat, 16 Jan 2021 11:06:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/posts/scheduler_public/</guid>
+    <description><![CDATA[Kubernetes Scheduler ​ 最近在看 k8s 调度相关的一些内容，希望给自己这阵子了解的知识进行一个整理，会连载几篇文章，都会关于调度的，初步的想法是 kubernetes 的默认调度器，然后]]></description>
+</item><item>
+    <title>ElasticDL 弹性分布式研读</title>
+    <link>https://kuikuikuizzz.github.io/posts/elasticdl/</link>
+    <pubDate>Mon, 07 Sep 2020 22:22:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/posts/elasticdl/</guid>
+    <description><![CDATA[项目介绍 ElasticDL 是蚂蚁金服开源的一个基于 TensorFlow 2.0 eager execution 和 Kubernetes 的弹性分布式深度学习框架。ElasticDL 没有像 Kubeflow 和 pytorch/elastic 那样选择开发 Kubernetes Operator，整个 elasticDL]]></description>
+</item><item>
+    <title>Pytorch/elstic 弹性分布式研读</title>
+    <link>https://kuikuikuizzz.github.io/posts/pytorch_elastic/</link>
+    <pubDate>Sun, 23 Aug 2020 22:06:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/posts/pytorch_elastic/</guid>
+    <description><![CDATA[项目介绍 Pytorch/elastic （下称 elastic） 是 pytorch 1.4 作为新 feature 和 pytorch/serve 等功能一同引入的。从使用上，可以看出 elastic 有意地维持了跟原来使用 torch.distributed.launch 等接口的相似性，大致看使用过]]></description>
+</item></channel>
+</rss>

@@ -1,7 +1,78 @@
 <rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
     <channel>
-        <title>Tags - 标签 - 打怪實錄</title>
+        <title>Tags - 标签 - kuikuikuizzZ blog</title>
         <link>https://kuikuikuizzz.github.io/tags/</link>
-        <description>Tags - 标签 - 打怪實錄</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><atom:link href="https://kuikuikuizzz.github.io/tags/" rel="self" type="application/rss+xml" /></channel>
+        <description>Tags - 标签 - kuikuikuizzZ blog</description>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><managingEditor>kimmmywu@gmail.com (kuikuikuizzZ)</managingEditor>
+            <webMaster>kimmmywu@gmail.com (kuikuikuizzZ)</webMaster><lastBuildDate>Sat, 06 Feb 2021 11:06:54 &#43;0800</lastBuildDate><atom:link href="https://kuikuikuizzz.github.io/tags/" rel="self" type="application/rss+xml" /><item>
+    <title>kubernetes</title>
+    <link>https://kuikuikuizzz.github.io/tags/kubernetes/</link>
+    <pubDate>Sat, 06 Feb 2021 11:06:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/tags/kubernetes/</guid>
+    <description><![CDATA[]]></description>
+</item><item>
+    <title>scheduler</title>
+    <link>https://kuikuikuizzz.github.io/tags/scheduler/</link>
+    <pubDate>Sat, 06 Feb 2021 11:06:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/tags/scheduler/</guid>
+    <description><![CDATA[]]></description>
+</item><item>
+    <title>distributed training</title>
+    <link>https://kuikuikuizzz.github.io/tags/distributed-training/</link>
+    <pubDate>Mon, 07 Dec 2020 11:06:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/tags/distributed-training/</guid>
+    <description><![CDATA[]]></description>
+</item><item>
+    <title>horovod</title>
+    <link>https://kuikuikuizzz.github.io/tags/horovod/</link>
+    <pubDate>Mon, 07 Dec 2020 11:06:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/tags/horovod/</guid>
+    <description><![CDATA[]]></description>
+</item><item>
+    <title>elastic</title>
+    <link>https://kuikuikuizzz.github.io/tags/elastic/</link>
+    <pubDate>Mon, 07 Sep 2020 22:22:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/tags/elastic/</guid>
+    <description><![CDATA[]]></description>
+</item><item>
+    <title>machine learning</title>
+    <link>https://kuikuikuizzz.github.io/tags/machine-learning/</link>
+    <pubDate>Mon, 07 Sep 2020 22:22:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/tags/machine-learning/</guid>
+    <description><![CDATA[]]></description>
+</item><item>
+    <title>tensorflow</title>
+    <link>https://kuikuikuizzz.github.io/tags/tensorflow/</link>
+    <pubDate>Mon, 07 Sep 2020 22:22:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/tags/tensorflow/</guid>
+    <description><![CDATA[]]></description>
+</item><item>
+    <title>pytorch</title>
+    <link>https://kuikuikuizzz.github.io/tags/pytorch/</link>
+    <pubDate>Sun, 23 Aug 2020 22:06:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/tags/pytorch/</guid>
+    <description><![CDATA[]]></description>
+</item><item>
+    <title>工作</title>
+    <link>https://kuikuikuizzz.github.io/tags/%E5%B7%A5%E4%BD%9C/</link>
+    <pubDate>Sun, 09 Aug 2020 21:36:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/tags/%E5%B7%A5%E4%BD%9C/</guid>
+    <description><![CDATA[]]></description>
+</item><item>
+    <title>生活</title>
+    <link>https://kuikuikuizzz.github.io/tags/%E7%94%9F%E6%B4%BB/</link>
+    <pubDate>Sun, 09 Aug 2020 21:36:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/tags/%E7%94%9F%E6%B4%BB/</guid>
+    <description><![CDATA[]]></description>
+</item></channel>
 </rss>

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="robots" content="noodp" />
+        <meta http-equiv="X-UA-Compatible" content="IE=edge, chrome=1">
+        <title>Pytorch/elstic 弹性分布式研读 - kuikuikuizzZ blog</title><meta name="Description" content=""><meta property="og:title" content="Pytorch/elstic 弹性分布式研读" />
+<meta property="og:description" content="项目介绍 Pytorch/elastic （下称 elastic） 是 pytorch 1.4 作为新 feature 和 pytorch/serve 等功能一同引入的。从使用上，可以看出 elastic 有意地维持了跟原来使用 torch.distributed.launch 等接口的相似性，大致看使用过" />
+<meta property="og:type" content="article" />
+<meta property="og:url" content="https://kuikuikuizzz.github.io/posts/pytorch_elastic/" />
+<meta property="article:published_time" content="2020-08-23T22:06:54+08:00" />
+<meta property="article:modified_time" content="2020-08-23T22:06:54+08:00" />
+<meta name="twitter:card" content="summary"/>
+<meta name="twitter:title" content="Pytorch/elstic 弹性分布式研读"/>
+<meta name="twitter:description" content="项目介绍 Pytorch/elastic （下称 elastic） 是 pytorch 1.4 作为新 feature 和 pytorch/serve 等功能一同引入的。从使用上，可以看出 elastic 有意地维持了跟原来使用 torch.distributed.launch 等接口的相似性，大致看使用过"/>
+<meta name="application-name" content="kuikuikuizzZ blog">
+<meta name="apple-mobile-web-app-title" content="kuikuikuizzZ blog"><link rel="shortcut icon" type="image/x-icon" href="/favicon.ico" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png"><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"><link rel="manifest" href="/site.webmanifest"><link rel="canonical" href="https://kuikuikuizzz.github.io/posts/pytorch_elastic/" /><link rel="prev" href="https://kuikuikuizzz.github.io/posts/lifenote/2yearsengineer/" /><link rel="next" href="https://kuikuikuizzz.github.io/posts/elasticdl/" /><link rel="stylesheet" href="/lib/normalize/normalize.min.css"><link rel="stylesheet" href="/css/style.min.css"><link rel="stylesheet" href="/lib/fontawesome-free/all.min.css"><link rel="stylesheet" href="/lib/animate/animate.min.css"><script type="application/ld+json">
+    {
+        "@context": "http://schema.org",
+        "@type": "BlogPosting",
+        "headline": "Pytorch/elstic 弹性分布式研读",
+        "inLanguage": "zh-CN",
+        "mainEntityOfPage": {
+            "@type": "WebPage",
+            "@id": "https:\/\/kuikuikuizzz.github.io\/posts\/pytorch_elastic\/"
+        },"genre": "posts","keywords": "elastic, kubernetes, pytorch, machine learning","wordcount":  2455 ,
+        "url": "https:\/\/kuikuikuizzz.github.io\/posts\/pytorch_elastic\/","datePublished": "2020-08-23T22:06:54+08:00","dateModified": "2020-08-23T22:06:54+08:00","publisher": {
+            "@type": "Organization",
+            "name": "kuikuikuizzZ"},"author": {
+                "@type": "Person",
+                "name": "kuikuikuizzZ"
+            },"description": ""
+    }
+    </script></head>
+    <body header-desktop="" header-mobile=""><script type="text/javascript">(window.localStorage && localStorage.getItem('theme') ? localStorage.getItem('theme') === 'dark' : ('' === 'auto' ? window.matchMedia('(prefers-color-scheme: dark)').matches : '' === 'dark')) && document.body.setAttribute('theme', 'dark');</script>
+
+        <div id="mask"></div><div class="wrapper"><header class="desktop" id="header-desktop">
+    <div class="header-wrapper">
+        <div class="header-title">
+            <a href="/" title="kuikuikuizzZ blog">kuikuikuizzZ blog</a>
+        </div>
+        <div class="menu">
+            <div class="menu-inner"><a class="menu-item" href="/posts/"> 文章 </a><a class="menu-item" href="/tags/"> 标签 </a><a class="menu-item" href="/categories/"> 分类 </a><a class="menu-item" href="/about/"> 关于 </a><span class="menu-item delimiter"></span><span class="menu-item search" id="search-desktop">
+                        <input type="text" placeholder="搜索文章标题或内容..." id="search-input-desktop">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-desktop" title="搜索">
+                            <i class="fas fa-search fa-fw"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-desktop" title="清空">
+                            <i class="fas fa-times-circle fa-fw"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-desktop">
+                            <i class="fas fa-spinner fa-fw fa-spin"></i>
+                        </span>
+                    </span><a href="javascript:void(0);" class="menu-item theme-switch" title="切换主题">
+                    <i class="fas fa-adjust fa-fw"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+</header><header class="mobile" id="header-mobile">
+    <div class="header-container">
+        <div class="header-wrapper">
+            <div class="header-title">
+                <a href="/" title="kuikuikuizzZ blog">kuikuikuizzZ blog</a>
+            </div>
+            <div class="menu-toggle" id="menu-toggle-mobile">
+                <span></span><span></span><span></span>
+            </div>
+        </div>
+        <div class="menu" id="menu-mobile"><div class="search-wrapper">
+                    <div class="search mobile" id="search-mobile">
+                        <input type="text" placeholder="搜索文章标题或内容..." id="search-input-mobile">
+                        <a href="javascript:void(0);" class="search-button search-toggle" id="search-toggle-mobile" title="搜索">
+                            <i class="fas fa-search fa-fw"></i>
+                        </a>
+                        <a href="javascript:void(0);" class="search-button search-clear" id="search-clear-mobile" title="清空">
+                            <i class="fas fa-times-circle fa-fw"></i>
+                        </a>
+                        <span class="search-button search-loading" id="search-loading-mobile">
+                            <i class="fas fa-spinner fa-fw fa-spin"></i>
+                        </span>
+                    </div>
+                    <a href="javascript:void(0);" class="search-cancel" id="search-cancel-mobile">
+                        取消
+                    </a>
+                </div><a class="menu-item" href="/posts/" title="">文章</a><a class="menu-item" href="/tags/" title="">标签</a><a class="menu-item" href="/categories/" title="">分类</a><a class="menu-item" href="/about/" title="">关于</a><a href="javascript:void(0);" class="menu-item theme-switch" title="切换主题">
+                <i class="fas fa-adjust fa-fw"></i>
+            </a></div>
+    </div>
+</header>
+<div class="search-dropdown desktop">
+    <div id="search-dropdown-desktop"></div>
+</div>
+<div class="search-dropdown mobile">
+    <div id="search-dropdown-mobile"></div>
+</div>
+<main class="main">
+                <div class="container"><div class="toc" id="toc-auto">
+            <h2 class="toc-title">目录</h2>
+            <div class="toc-content" id="toc-content-auto"></div>
+        </div><article class="page single"><h1 class="single-title animated flipInX">Pytorch/elstic 弹性分布式研读</h1><div class="post-meta">
+            <div class="post-meta-line"><span class="post-author"><a href="/" title="Author" rel=" author" class="author"><i class="fas fa-user-circle fa-fw"></i>kuikuikuizzZ</a></span>&nbsp;<span class="post-category">收录于 <a href="/categories/%E6%8A%80%E6%9C%AF/"><i class="far fa-folder fa-fw"></i>技术</a></span></div>
+            <div class="post-meta-line"><i class="far fa-calendar-alt fa-fw"></i>&nbsp;<time datetime="2020-08-23">2020-08-23</time>&nbsp;<i class="fas fa-pencil-alt fa-fw"></i>&nbsp;约 2455 字&nbsp;
+                <i class="far fa-clock fa-fw"></i>&nbsp;预计阅读 5 分钟&nbsp;</div>
+        </div><div class="details toc" id="toc-static"  kept="">
+                <div class="details-summary toc-title">
+                    <span>目录</span>
+                    <span><i class="details-icon fas fa-angle-right"></i></span>
+                </div>
+                <div class="details-content toc-content" id="toc-content-static"><nav id="TableOfContents">
+  <ul>
+    <li><a href="#项目介绍">项目介绍</a></li>
+    <li><a href="#系统架构">系统架构</a></li>
+    <li><a href="#整体流程">整体流程</a>
+      <ul>
+        <li><a href="#正常启动流程">正常启动流程</a></li>
+        <li><a href="#node-上-training-process-报错">node 上 training process 报错</a></li>
+        <li><a href="#nodeagent-报错">node/agent 报错</a></li>
+      </ul>
+    </li>
+    <li><a href="#kubenetes-支持">Kubenetes 支持</a>
+      <ul>
+        <li><a href="#尝试启用">尝试启用</a></li>
+        <li><a href="#查看相关资源">查看相关资源</a></li>
+        <li><a href="#对比kubeflowpytorch-operator">对比kubeflow/pytorch-operator</a></li>
+        <li><a href="#局限">局限</a></li>
+      </ul>
+    </li>
+    <li><a href="#结论">结论</a>
+      <ul>
+        <li><a href="#参考">参考</a></li>
+      </ul>
+    </li>
+  </ul>
+</nav></div>
+            </div><div class="content" id="content"><h2 id="项目介绍">项目介绍</h2>
+<p>Pytorch/elastic （下称 elastic） 是 pytorch 1.4 作为新 feature 和 pytorch/serve 等功能一同引入的。从使用上，可以看出 elastic 有意地维持了跟原来使用 torch.distributed.launch 等接口的相似性，大致看使用过 pytorch 提供的分布式训练脚本，基本上可以很快配置好 elastic 分布式任务。学习成本相对较低。</p>
+<h2 id="系统架构">系统架构</h2>
+<p>下图为 pytorch/elastic 系统设计示例图。</p>
+<figure>
+    <img src="v2-20dd0be5ff19d3549c174774afa899ec_b.png"/> 
+</figure>
+
+<p>Elastic 主要的原理是在每一个正在跑 pytorch 分布式任务的 node 上，会有一个代理进程（下称 agent） 不断地去观测 node 上分布式任务进程的状态，然后把状态上报到一个 key-value 的 server 上，默认使用的是 etcd。</p>
+<p>agent 是每一个 process group 在 每个 node 上面跑的管理进程。主要是同步该 node 跟其他 node 的关系（membership）。（如：其他 node 上的进程死掉了，我的 rank 和 world_size 应该怎么变化）。</p>
+<p>不同 node 的关系是这样处理的，如果有一个 node 上的 worker 出现了错误，这个 node 的 agent 会去重新启动这些 worker，如果是这个节点出了问题，就是agent 也没有了响应，需要更加高层的 owner 去管理 （一般还是 restart 这个 job）。这些信息都会同步到对应的 world_size 和 rank 上，所以 training script 可能更新的时候需要确认world_size 和 rank 没有被改变。</p>
+<h2 id="整体流程">整体流程</h2>
+<h3 id="正常启动流程">正常启动流程</h3>
+<p>假设你现在有3台互联的机器，需要在一台机器上启动etcd，作为monitor</p>
+<div class="highlight"><pre class="chroma"><code class="language-shell" data-lang="shell">etcd    --enable-v2
+        --listen-client-urls http://0.0.0.0:2379,http://127.0.0.1:4001    
+        --advertise-client-urls PUBLIC_HOSTNAME:2379
+</code></pre></div><p>在其他两台机器上运行训练代码</p>
+<div class="highlight"><pre class="chroma"><code class="language-python" data-lang="python"><span class="n">python</span> <span class="o">-</span><span class="n">m</span> <span class="n">torchelastic</span><span class="o">.</span><span class="n">distributed</span><span class="o">.</span><span class="n">launch</span>
+        <span class="o">--</span><span class="n">nnodes</span><span class="o">=</span><span class="n">MIN_SIZE</span><span class="p">:</span><span class="n">MAX_SIZE</span>
+        <span class="o">--</span><span class="n">nproc_per_node</span><span class="o">=</span><span class="n">TRAINERS_PER_NODE</span>
+        <span class="o">--</span><span class="n">rdzv_id</span><span class="o">=</span><span class="n">JOB_ID</span>
+        <span class="o">--</span><span class="n">rdzv_backend</span><span class="o">=</span><span class="n">etcd</span>
+        <span class="o">--</span><span class="n">rdzv_endpoint</span><span class="o">=</span><span class="n">ETCD_HOST</span><span class="p">:</span><span class="n">ETCD_PORT</span>
+        <span class="n">YOUR_TRAINING_SCRIPT</span><span class="o">.</span><span class="n">py</span> <span class="o">--</span><span class="n">arg1</span> <span class="c1"># train script args</span>
+</code></pre></div><p>这里：</p>
+<p>&ndash; nnodes 是指运行分布式训练的 node 数，如果是一个数值，整个训练过程会保持这个 node 数。如果是一个区间就代表这个训练的 node 数可变。（注意：如果设置了 node 可变的训练代码需要做一些适配，ElasticDistributedSampler )。</p>
+<p>&ndash;rdzv_id 是这个job 的一个名字，不同的worker这个需要相同，</p>
+<p>&ndash;rdzv_backend 是指 monitor 的后端默认是 etcd，</p>
+<p>&ndash;rdzv_endpoint 是 monitor 的 ip 和 端口。</p>
+<p>下图为运行逻辑示意图：</p>
+<figure>
+    <img src="v2-fee94053955501d8a013b978ca9a57b0_b.png"/> 
+</figure>
+
+<p>当 job 起来之后，训练进程（下称 process）会自己跑自己的训练代码，跟没有 agent 一样，只是在开始的时候 agent 会把原来一些 <strong>torch.distributed.launch</strong> 做的工作做了，然后传给训练的进程。agent 会定时触发类似一个<strong>存活指针</strong>的验证流程（默认是 30s 触发一次），查看process的状态，如果没有报错，会作一次 rendezvous 的动作，同时会同步现在进程的状态（下称status）到 monitor 上。</p>
+<h3 id="node-上-training-process-报错">node 上 training process 报错</h3>
+<p>如果 node 上一个或者多个 process 报错，agent 会重启这个 node 下所有的 process。训练代码需要自己完成加载最近 checkpoint 功能。agent 会把 monitor 上的 status 同步到该 node 上所有的process （如 epoch, optimizer, accuracy 等），继续原来的训练。所以在重启的worker 会一直跑，跑到分布式的 all_reduce的时候，一起更新权重这样权重就一致了， 然后state.epoch 下也会在新的一次 epoch 更新一致。</p>
+<h3 id="nodeagent-报错">node/agent 报错</h3>
+<p>如果是 node 或者是 node 上 agent 报错，上述的 rendezvous 动作会被阻塞（下称 barrier），如果阻塞的时间在允许范围内重新连接了，rendezvous 会继续。如果时间超过允许范围了，会从这个 job 中排除这个 node，然后重启所有 node 上所有的 processes。读取对应的 checkpoint，和根据 monitor state 恢复最近checkpoint 的状态。</p>
+<h2 id="kubenetes-支持">Kubenetes 支持</h2>
+<p>上述的流程一般需要一个更高级的owner 去管理这个job（agent 挂了需要重启这个node等），默认是 k8s。所以 elastic 也实现了管理 elasticjob CRD 的 controller。</p>
+<p>api/v1alpha1/elasticjob_types.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-go" data-lang="go"><span class="kd">type</span> <span class="nx">ElasticJobSpec</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="c1">// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
+</span><span class="c1"></span>    <span class="c1">// Important: Run &#34;make&#34; to regenerate code after modifying this file
+</span><span class="c1"></span>    <span class="nx">RunPolicy</span> <span class="nx">common</span><span class="p">.</span><span class="nx">RunPolicy</span> <span class="s">`json:&#34;,inline&#34;`</span>
+
+    <span class="c1">// +kubebuilder:validation:MinItems=1
+</span><span class="c1"></span>    <span class="nx">ReplicaSpecs</span> <span class="kd">map</span><span class="p">[</span><span class="nx">common</span><span class="p">.</span><span class="nx">ReplicaType</span><span class="p">]</span><span class="o">*</span><span class="nx">common</span><span class="p">.</span><span class="nx">ReplicaSpec</span> <span class="s">`json:&#34;replicaSpecs&#34;`</span>
+    <span class="nx">RdzvEndpoint</span> <span class="kt">string</span>                                     <span class="s">`json:&#34;rdzvEndpoint&#34;`</span>
+
+    <span class="c1">// +kubebuilder:validation:Minimum=1
+</span><span class="c1"></span>    <span class="nx">MinReplicas</span> <span class="o">*</span><span class="kt">int32</span> <span class="s">`json:&#34;minReplicas,omitempty&#34;`</span>
+    <span class="nx">MaxReplicas</span> <span class="o">*</span><span class="kt">int32</span> <span class="s">`json:&#34;maxReplicas,omitempty&#34;`</span>
+<span class="p">}</span>
+<span class="c1">// ElasticJobStatus defines the observed state of ElasticJob
+</span><span class="c1"></span><span class="kd">type</span> <span class="nx">ElasticJobStatus</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="c1">// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
+</span><span class="c1"></span>    <span class="c1">// Important: Run &#34;make&#34; to regenerate code after modifying this file
+</span><span class="c1"></span>    <span class="nx">common</span><span class="p">.</span><span class="nx">JobStatus</span> <span class="s">`json:&#34;,inline&#34;`</span>
+<span class="p">}</span>
+
+<span class="c1">// ElasticJob is the Schema for the elasticjobs API
+</span><span class="c1"></span><span class="kd">type</span> <span class="nx">ElasticJob</span> <span class="kd">struct</span> <span class="p">{</span>
+    <span class="nx">metav1</span><span class="p">.</span><span class="nx">TypeMeta</span>   <span class="s">`json:&#34;,inline&#34;`</span>
+    <span class="nx">metav1</span><span class="p">.</span><span class="nx">ObjectMeta</span> <span class="s">`json:&#34;metadata,omitempty&#34;`</span>
+
+
+    <span class="nx">Spec</span>   <span class="nx">ElasticJobSpec</span>   <span class="s">`json:&#34;spec,omitempty&#34;`</span>
+    <span class="nx">Status</span> <span class="nx">ElasticJobStatus</span> <span class="s">`json:&#34;status,omitempty&#34;`</span>
+<span class="p">}</span>
+</code></pre></div><h3 id="尝试启用">尝试启用</h3>
+<p>实测使用 class-vion.yaml，需要先启动 etcd</p>
+<p><strong>➜</strong> <strong>samples</strong> <strong>git:(master) ✗</strong> kubectl  apply -f etcd.yaml</p>
+<p><strong>➜</strong> <strong>samples-10</strong> <strong>git:(master) ✗</strong> kubectl apply -f classy-vision.yaml</p>
+<p>config/samples/class-vision.yaml</p>
+<div class="highlight"><pre class="chroma"><code class="language-yaml" data-lang="yaml"><span class="k">apiVersion</span><span class="p">:</span><span class="w"> </span>elastic.pytorch.org/v1alpha1<span class="w">
+</span><span class="w"></span><span class="k">kind</span><span class="p">:</span><span class="w"> </span>ElasticJob<span class="w">
+</span><span class="w"></span><span class="k">metadata</span><span class="p">:</span><span class="w">
+</span><span class="w">  </span><span class="k">name</span><span class="p">:</span><span class="w"> </span>classy-vision<span class="w">
+</span><span class="w">  </span><span class="k">namespace</span><span class="p">:</span><span class="w"> </span>elastic-job<span class="w">
+</span><span class="w"></span><span class="k">spec</span><span class="p">:</span><span class="w">
+</span><span class="w">  </span><span class="c"># Use &#34;etcd-service:2379&#34; if you already apply etcd.yaml</span><span class="w">
+</span><span class="w">  </span><span class="k">rdzvEndpoint</span><span class="p">:</span><span class="w"> </span><span class="s2">&#34;etcd-service:2379&#34;</span><span class="w">
+</span><span class="w">  </span><span class="k">minReplicas</span><span class="p">:</span><span class="w"> </span><span class="m">1</span><span class="w">
+</span><span class="w">  </span><span class="k">maxReplicas</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span><span class="w">  </span><span class="k">replicaSpecs</span><span class="p">:</span><span class="w">
+</span><span class="w">    </span><span class="k">Worker</span><span class="p">:</span><span class="w">
+</span><span class="w">      </span><span class="k">replicas</span><span class="p">:</span><span class="w"> </span><span class="m">2</span><span class="w">
+</span><span class="w">      </span><span class="k">restartPolicy</span><span class="p">:</span><span class="w"> </span>ExitCode<span class="w">
+</span><span class="w">      </span><span class="k">template</span><span class="p">:</span><span class="w">
+</span><span class="w">        </span><span class="k">apiVersion</span><span class="p">:</span><span class="w"> </span>v1<span class="w">
+</span><span class="w">        </span><span class="k">kind</span><span class="p">:</span><span class="w"> </span>Pod<span class="w">
+</span><span class="w">        </span><span class="k">spec</span><span class="p">:</span><span class="w">
+</span><span class="w">          </span><span class="k">containers</span><span class="p">:</span><span class="w">
+</span><span class="w">            </span>- <span class="k">name</span><span class="p">:</span><span class="w"> </span>elasticjob-worker<span class="w">
+</span><span class="w">              </span><span class="k">image</span><span class="p">:</span><span class="w"> </span>torchelastic/examples<span class="p">:</span><span class="m">0.2.0</span><span class="w">
+</span><span class="w">              </span><span class="k">imagePullPolicy</span><span class="p">:</span><span class="w"> </span>Always<span class="w">
+</span><span class="w">              </span><span class="k">args</span><span class="p">:</span><span class="w">
+</span><span class="w">                </span>- <span class="s2">&#34;--nproc_per_node=1&#34;</span><span class="w">
+</span><span class="w">                </span>- <span class="s2">&#34;/workspace/classy_vision/classy_train.py&#34;</span><span class="w">
+</span><span class="w">                </span>- <span class="s2">&#34;--config_file&#34;</span><span class="w">
+</span><span class="w">                </span>- <span class="s2">&#34;/workspace/classy_vision/configs/template_config.json&#34;</span><span class="w">
+</span><span class="w">                </span><span class="c"># number of data loader workers (NOT trainers)</span><span class="w">
+</span><span class="w">                </span><span class="c"># zero means load the data on the same process as the trainer</span><span class="w">
+</span><span class="w">                </span><span class="c"># this is set so that the container does not OOM since</span><span class="w">
+</span><span class="w">                </span><span class="c"># pytorch data loaders use shm</span><span class="w">
+</span><span class="w">                </span>- <span class="s2">&#34;--num_workers=0&#34;</span><span class="w">
+</span></code></pre></div><h3 id="查看相关资源">查看相关资源</h3>
+<div class="highlight"><pre class="chroma"><code class="language-shell" data-lang="shell">➜  samples git:<span class="o">(</span>master<span class="o">)</span> ✗ kubectl -n elastic-job get elasticjobs           
+NAME       AGE
+classy-vision  9d
+➜  samples git:<span class="o">(</span>master<span class="o">)</span> ✗ kubectl -n elastic-job get po
+NAME                      READY  STATUS    RESTARTS  AGE
+classy-vision-worker-0             0/1   Completed  <span class="m">0</span>      8d
+classy-vision-worker-1             0/1   Completed  <span class="m">0</span>      8d
+etcd                          1/1   Running   <span class="m">0</span>      9d
+➜  samples git:<span class="o">(</span>master<span class="o">)</span> ✗ kubectl -n elastic-job get svc                    
+NAME                          TYPE     CLUSTER-IP    EXTERNAL-IP  PORT<span class="o">(</span>S<span class="o">)</span>   AGE
+classy-vision-worker-0                 ClusterIP  None       &lt;none&gt;     &lt;none&gt;   9d
+classy-vision-worker-1                 ClusterIP  None       &lt;none&gt;     &lt;none&gt;   9d
+etcd-service                      ClusterIP  10.254.74.130   &lt;none&gt;     2379/TCP 9d
+</code></pre></div><p>上面显示了起一个 elastic-job 创建的资源，整个训练的流程会需要预先创建一个 etcd service 服务，然后创建 elasticjob，整个流程跟 pytorch-job 很类似，也是会为每个运行实例（下称 worker ）创建 pod 和 service。结束会回收资源等。agent 自己是以进程的形式运行在 worker 中。</p>
+<h3 id="对比kubeflowpytorch-operator">对比kubeflow/pytorch-operator</h3>
+<p>整体上说，pytorch/elastic 跟 kubeflow/pytorch-operator 使用是比较类似的，需要做一些适应性调整可以跟 kubeflow/pytorch-operator 保持行为一致，如：</p>
+<p>elastic/kubernetes/controllers/pod.go</p>
+<div class="highlight"><pre class="chroma"><code class="language-shell" data-lang="shell">// Set pod environment <span class="nb">set</span> <span class="k">for</span> ElasticJob
+func SetClusterSpecForPod<span class="o">(</span>job interface<span class="o">{}</span>, podTemplate *corev1.PodTemplateSpec<span class="o">)</span> error <span class="o">{</span>
+    ...
+    launchDefaultArgs :<span class="o">=</span> <span class="o">[]</span>string<span class="o">{</span>
+        <span class="s2">&#34;--rdzv_backend=etcd&#34;</span>,
+        <span class="s2">&#34;--rdzv_endpoint=&#34;</span> + elasticJob.Spec.RdzvEndpoint,
+        <span class="s2">&#34;--rdzv_id=&#34;</span> + elasticJob.Name,
+        <span class="s2">&#34;--nnodes=&#34;</span> + strconv.Itoa<span class="o">(</span>int<span class="o">(</span>minReplicas<span class="o">))</span> + <span class="s2">&#34;:&#34;</span> + strconv.Itoa<span class="o">(</span>int<span class="o">(</span>maxReplicas<span class="o">))}</span>
+
+    <span class="k">for</span> i :<span class="o">=</span> range podTemplate.Spec.Containers <span class="o">{</span>
+        podTemplate.Spec.Containers<span class="o">[</span>i<span class="o">]</span>.Args <span class="o">=</span> append<span class="o">(</span>launchDefaultArgs, podTemplate.Spec.Containers<span class="o">[</span>i<span class="o">]</span>.Args...<span class="o">)</span>
+    <span class="o">}</span>
+
+    <span class="k">return</span> nil
+<span class="o">}</span>
+</code></pre></div><p>直接在 controller 里面添加运行代码参数 pod.spec.container.args，然后在 elasticjob.yaml 中的 pod.spec.container[i].args 只填了一部分。 在 pytorch-operator 是需要把全部的命令填写完整的。</p>
+<h3 id="局限">局限</h3>
+<p>直接使用 etcd 作为 key-value store 感觉有点杀鸡用牛刀了，而且一般只会起一个 etcd 的服务器（如果集群内跑的elastic-job 不是很多，起多个会导致资源浪费），只起一个没办法很完整地使用上 etcd 高可用的特性。pytorch/elastic 提供了相关的RendezvousHandler接口，可以使用不同的key-value store server。</p>
+<p>####　适应性调整</p>
+<p>自己的想法：另外写一个 crd 把每次同步的信息，作为 status。然后 RendezvousHandler 下面的api，通过 k8s client 跟读写 crd 的 status 信息。</p>
+<div class="highlight"><pre class="chroma"><code class="language-python" data-lang="python"><span class="k">class</span> <span class="nc">RendezvousHandler</span><span class="p">(</span><span class="n">abc</span><span class="o">.</span><span class="n">ABC</span><span class="p">):</span>
+    <span class="nd">@abc.abstractmethod</span>
+    <span class="c1"># pyre-fixme[11]: Annotation `Store` is not defined as a type.</span>
+    <span class="c1"># pyre-fixme[10]: Name `torch` is used but not defined.</span>
+    <span class="k">def</span> <span class="nf">next_rendezvous</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="s2">&#34;torch.distributed.Store&#34;</span><span class="p">,</span> <span class="nb">int</span><span class="p">,</span> <span class="nb">int</span><span class="p">]:</span>
+        <span class="s2">&#34;&#34;&#34;
+</span><span class="s2">        每隔一段时间要做一次的同步
+</span><span class="s2">        &#34;&#34;&#34;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abc.abstractmethod</span>
+    <span class="k">def</span> <span class="nf">is_closed</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">bool</span><span class="p">:</span>
+        <span class="k">pass</span>
+    <span class="nd">@abc.abstractmethod</span>
+    <span class="k">def</span> <span class="nf">set_closed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+       <span class="k">pass</span>
+
+    <span class="nd">@abc.abstractmethod</span>
+    <span class="k">def</span> <span class="nf">num_nodes_waiting</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="s2">&#34;&#34;&#34;
+</span><span class="s2">        表示有多少的 nodes 已经跑到 barrier 那里了。
+</span><span class="s2">        &#34;&#34;&#34;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@abc.abstractmethod</span>
+    <span class="k">def</span> <span class="nf">get_run_id</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="s2">&#34;&#34;&#34;
+</span><span class="s2">        获取这个 job-id，相当于这个job的标识
+</span><span class="s2">        &#34;&#34;&#34;</span>
+        <span class="k">pass</span>
+</code></pre></div><p>相当于替换掉etcd，信息通过k8s 的资源 status 同步。如果使用这个方法，是会比较 k8s native 一点，不过需要给不同的 worker k8s client 的权限，这个可能会引入安全性的问题。</p>
+<h2 id="结论">结论</h2>
+<p>整体上，pytorch/elastic 的只实现了一部分的弹性，<strong>可以缩容不可以扩容</strong>。死掉的 worker 如果超时了，即使重启后也不能再加进去。另外，默认使用 etcd 和一些不是很直观的使用方法，还不是很方便。不过，有 pytorch 官方背书，也确认 elastic 不负责 checkpoint reload，需要用户自己解决这一点，我感觉是合理的。</p>
+<p>后续 PyTorch Elastic 在 Kubeflow 中的支持在 <a href="https://github.com/pytorch/elastic/issues/117">https://github.com/pytorch/elastic/issues/117</a> 中跟踪。</p>
+<h3 id="参考">参考</h3>
+<p><a href="https://github.com/pytorch/elastic" target="_blank" rel="noopener noreffer">pytorch/elastic</a></p>
+</div><div class="post-footer" id="post-footer">
+    <div class="post-info">
+        <div class="post-info-line">
+            <div class="post-info-mod">
+                <span>更新于 2020-08-23</span>
+            </div>
+            <div class="post-info-license"></div>
+        </div>
+        <div class="post-info-line">
+            <div class="post-info-md"></div>
+            <div class="post-info-share">
+                <span></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="post-info-more">
+        <section class="post-tags"><i class="fas fa-tags fa-fw"></i>&nbsp;<a href="/tags/elastic/">elastic</a>,&nbsp;<a href="/tags/kubernetes/">kubernetes</a>,&nbsp;<a href="/tags/pytorch/">pytorch</a>,&nbsp;<a href="/tags/machine-learning/">machine learning</a></section>
+        <section>
+            <span><a href="javascript:void(0);" onclick="window.history.back();">返回</a></span>&nbsp;|&nbsp;<span><a href="/">主页</a></span>
+        </section>
+    </div>
+
+    <div class="post-nav"><a href="/posts/lifenote/2yearsengineer/" class="prev" rel="prev" title="工作两年"><i class="fas fa-angle-left fa-fw"></i>工作两年</a>
+            <a href="/posts/elasticdl/" class="next" rel="next" title="ElasticDL 弹性分布式研读">ElasticDL 弹性分布式研读<i class="fas fa-angle-right fa-fw"></i></a></div>
+</div>
+</article></div>
+            </main><footer class="footer">
+        <div class="footer-container"><div class="footer-line"><i class="far fa-copyright fa-fw"></i><span itemprop="copyrightYear">2021</span><span class="author" itemprop="copyrightHolder">&nbsp;<a href="/" target="_blank">kuikuikuizzZ</a></span>&nbsp;|&nbsp;<span class="license"><a rel="license external nofollow noopener noreffer" href="https://creativecommons.org/licenses/by-nc/4.0/" target="_blank">CC BY-NC 4.0</a></span></div>
+        </div>
+    </footer></div>
+
+        <div id="fixed-buttons"><a href="#" id="back-to-top" class="fixed-button" title="回到顶部">
+                <i class="fas fa-arrow-up fa-fw"></i>
+            </a><a href="#" id="view-comments" class="fixed-button" title="查看评论">
+                <i class="fas fa-comment fa-fw"></i>
+            </a>
+        </div><link rel="stylesheet" href="/lib/lightgallery/lightgallery.min.css"><script type="text/javascript" src="/lib/smooth-scroll/smooth-scroll.min.js"></script><script type="text/javascript" src="/lib/autocomplete/autocomplete.min.js"></script><script type="text/javascript" src="/lib/algoliasearch/algoliasearch-lite.umd.min.js"></script><script type="text/javascript" src="/lib/lazysizes/lazysizes.min.js"></script><script type="text/javascript" src="/lib/lightgallery/lightgallery.min.js"></script><script type="text/javascript" src="/lib/lightgallery/lg-thumbnail.min.js"></script><script type="text/javascript" src="/lib/lightgallery/lg-zoom.min.js"></script><script type="text/javascript" src="/lib/clipboard/clipboard.min.js"></script><script type="text/javascript">window.config={"code":{"copyTitle":"复制到剪贴板","maxShownLines":10},"comment":{},"lightGallery":{"actualSize":false,"exThumbImage":"data-thumbnail","hideBarsDelay":2000,"selector":".lightgallery","speed":400,"thumbContHeight":80,"thumbWidth":80,"thumbnail":true},"search":{"algoliaAppID":"","algoliaIndex":"","algoliaSearchKey":"","highlightTag":"em","maxResultLength":10,"noResultsFound":"没有找到结果","snippetLength":50,"type":"algolia"}};</script><script type="text/javascript" src="/js/theme.min.js"></script></body>
+</html>

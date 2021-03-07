@@ -1,9 +1,10 @@
 <rss xmlns:atom="http://www.w3.org/2005/Atom" version="2.0">
     <channel>
-        <title>打怪實錄</title>
+        <title>kuikuikuizzZ blog</title>
         <link>https://kuikuikuizzz.github.io/</link>
-        <description>打怪實錄</description>
-        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><lastBuildDate>Sat, 06 Feb 2021 11:06:54 &#43;0800</lastBuildDate>
+        <description>kuikuikuizzZ blog</description>
+        <generator>Hugo -- gohugo.io</generator><language>zh-CN</language><managingEditor>kimmmywu@gmail.com (kuikuikuizzZ)</managingEditor>
+            <webMaster>kimmmywu@gmail.com (kuikuikuizzZ)</webMaster><lastBuildDate>Sat, 06 Feb 2021 11:06:54 &#43;0800</lastBuildDate>
             <atom:link href="https://kuikuikuizzz.github.io/index.xml" rel="self" type="application/rss+xml" />
         <item>
     <title>Volcano 批调度器源码分析</title>
@@ -33,5 +34,33 @@
     <author>作者</author>
     <guid>https://kuikuikuizzz.github.io/posts/horovod_public/</guid>
     <description><![CDATA[Horovod 源码分析 前言 最近有一些需求是跟分布式训练相关的，然后自己重新看了一下 horovod 的代码，感觉还是有一些不清晰的地方，所以尝试把自己的一些理解写下来，]]></description>
+</item><item>
+    <title>ElasticDL 弹性分布式研读</title>
+    <link>https://kuikuikuizzz.github.io/posts/elasticdl/</link>
+    <pubDate>Mon, 07 Sep 2020 22:22:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/posts/elasticdl/</guid>
+    <description><![CDATA[项目介绍 ElasticDL 是蚂蚁金服开源的一个基于 TensorFlow 2.0 eager execution 和 Kubernetes 的弹性分布式深度学习框架。ElasticDL 没有像 Kubeflow 和 pytorch/elastic 那样选择开发 Kubernetes Operator，整个 elasticDL]]></description>
+</item><item>
+    <title>Pytorch/elstic 弹性分布式研读</title>
+    <link>https://kuikuikuizzz.github.io/posts/pytorch_elastic/</link>
+    <pubDate>Sun, 23 Aug 2020 22:06:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/posts/pytorch_elastic/</guid>
+    <description><![CDATA[项目介绍 Pytorch/elastic （下称 elastic） 是 pytorch 1.4 作为新 feature 和 pytorch/serve 等功能一同引入的。从使用上，可以看出 elastic 有意地维持了跟原来使用 torch.distributed.launch 等接口的相似性，大致看使用过]]></description>
+</item><item>
+    <title>工作两年</title>
+    <link>https://kuikuikuizzz.github.io/posts/lifenote/2yearsengineer/</link>
+    <pubDate>Sun, 09 Aug 2020 21:36:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/posts/lifenote/2yearsengineer/</guid>
+    <description><![CDATA[工作两年 不知不觉已经工作两年了，一天天下来感觉充实而苦闷，充实是每天其实都能感觉自己在变强，很多的知识会扑面而来，如果不学就会自然落后了。苦]]></description>
+</item><item>
+    <title>回忆两年前</title>
+    <link>https://kuikuikuizzz.github.io/posts/lifenote/lookup2years/</link>
+    <pubDate>Sat, 01 Aug 2020 23:36:54 &#43;0800</pubDate>
+    <author>作者</author>
+    <guid>https://kuikuikuizzz.github.io/posts/lifenote/lookup2years/</guid>
+    <description><![CDATA[回忆两年前 大家好，我是吴文辉。是才云科技的一名工程师，算是一个半路出家的码农。现在工作的方向可能比较杂，计算机视觉，分布式机器学习，k8s 等]]></description>
 </item></channel>
 </rss>
